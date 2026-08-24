@@ -6,13 +6,6 @@ Users can upload or capture an image, and Laradama analyzes
 the image's context, mood, energy, and overall vibe to
 recommend music that fits the image.
 
-## Tech Stack
-
-- React
-- JavaScript
-- Tailwind CSS
-- Vite
-
 ## Planned Technologies
 
 - Vision AI
