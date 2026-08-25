@@ -52,7 +52,7 @@
 
 .ld-floaty { position: absolute; filter: blur(60px); opacity: 0.35; pointer-events: none; z-index: 0; }
 .ld-floaty.a { width: 340px; height: 340px; background: var(--color-laradama-brand); top: -80px; right: -120px; }
-.ld-floaty.b { width: 280px; height: 280px; background: var(--color-laradama-coral); bottom: -60px; left: -100px; opacity: 0.18; }
+.ld-floaty.b { width: 280px; height: 280px; background: var(--color-laradama-dim); bottom: -60px; left: -100px; opacity: 0.18; }
 
 .ld-device-frame { position: relative; overflow: hidden; transition: width 0.3s, height 0.3s, border-radius 0.3s, box-shadow 0.3s, transform 0.3s; z-index: 1; }
 .ld-device-frame .ld-browser-bar { display: none; }

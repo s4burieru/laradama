@@ -7,7 +7,7 @@ const matchedTrack = {
 
 export default function WhyItMatches() {
   return (
-    <section id="why" className="bg-[#121212] border-t border-laradama-line py-24">
+    <section id="why" className="bg-[#121212] border-t border-[#808080] py-24">
       <div className="mx-auto grid max-w-295 grid-cols-2 items-center gap-14 px-8 max-[900px]:grid-cols-1">
         {/* Why-it-matched mock card */}
         <div className="border border-laradama-brand bg-laradama-elevated p-5.5">

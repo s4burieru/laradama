@@ -10,11 +10,11 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 mx-0 h-20 w-full border-y border-[#454545] bg-[#151515]">
-      <nav className="mx-auto flex h-full max-w-375 items-center justify-between px-2">
+    <header className="sticky top-0 z-50 mx-0 h-20 w-full border-b border-[#808080] bg-[#121212]">
+      <nav className="mx-auto flex h-full max-w-375 items-center justify-between px-4 md:px-8">
         <div className="flex items-center gap-10">
           <a href="#" className="flex shrink-0 items-center gap-4 text-[36px] font-bold">
-            <img src="/laradama-logo.png" alt="Laradama logo" className="h-14 w-14 object-cover" />
+            <img src="/laradama-logo.png" alt="Laradama logo" className="h-12 w-12 object-cover" />
           </a>
 
           <ul className="hidden items-center gap-8 text-base text-[#d0d0d0] min-[640px]:flex">

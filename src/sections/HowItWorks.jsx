@@ -23,21 +23,21 @@ const steps = [
 
 export default function HowItWorks() {
   return (
-    <section id="how" className="bg-[#121212] border-t border-laradama-line py-24">
+    <section id="how" className="bg-[#121212] border-t border-[#808080] py-24">
       <div className="mx-auto max-w-375 px-8">
         <div className="mb-14 max-w-270">
           <div className="mb-4 inline-flex items-center gap-2 border border-laradama-brand px-3 py-1.5 font-mono text-xs text-laradama-brand">
             HOW IT WORKS
           </div>
           <h2 className="mb-3.5 font-display text-4xl font-bold">
-            From photo to playlist in four steps.
+            From <span className="text-laradama-brand">photo to playlist</span> in four steps.
           </h2>
           <p className="text-base leading-[1.6] text-laradama-dim">
             No manual tagging, no searching by genre. Laradama does the listening for you.
           </p>
         </div>
 
-        <div className="grid grid-cols-4 gap-px overflow-hidden border border-laradama-brand bg-[#121212] max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
+        <div className="grid grid-cols-4 gap-px overflow-hidden border border-laradama-brand/25 bg-[#121212] max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
           {steps.map((step) => (
             <div
               key={step.n}
