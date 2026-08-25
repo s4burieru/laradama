@@ -24,8 +24,8 @@ const steps = [
 export default function HowItWorks() {
   return (
     <section id="how" className="bg-[#121212] border-t border-laradama-line py-24">
-      <div className="mx-auto max-w-295 px-8">
-        <div className="mb-14 max-w-140">
+      <div className="mx-auto max-w-375 px-8">
+        <div className="mb-14 max-w-270">
           <div className="mb-4 inline-flex items-center gap-2 border border-laradama-brand px-3 py-1.5 font-mono text-xs text-laradama-brand">
             HOW IT WORKS
           </div>

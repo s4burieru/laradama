@@ -2,22 +2,22 @@ import { useState } from "react";
 
 const links = [
   { label: "About Laradama", href: "#about" },
+    { label: "How to Use", href: "#how-it-works" },
   { label: "Features", href: "#features" },
-  { label: "How to Use", href: "#how-it-works" },
 ];
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur">
-      <nav className="mx-auto flex max-w-295 items-center justify-between gap-8 px-8 py-4">
-        <div className="flex items-center gap-8">
-          <a href="#" className="flex items-center gap-2 shrink-0">
-            <img src="/laradama-logo.png" alt="Laradama logo" className="h-8 w-auto" />
+    <header className="sticky top-0 z-50 mx-0 h-20 w-full border-y border-[#454545] bg-[#151515]">
+      <nav className="mx-auto flex h-full max-w-375 items-center justify-between px-2">
+        <div className="flex items-center gap-10">
+          <a href="#" className="flex shrink-0 items-center gap-4 text-[36px] font-bold">
+            <img src="/laradama-logo.png" alt="Laradama logo" className="h-14 w-14 object-cover" />
           </a>
 
-          <ul className="hidden items-center gap-8 text-sm text-gray-300 md:flex">
+          <ul className="hidden items-center gap-8 text-base text-[#d0d0d0] min-[640px]:flex">
             {links.map((link) => (
               <li key={link.label}>
                 <a href={link.href} className="transition hover:text-white">
@@ -28,20 +28,20 @@ export default function Navbar() {
           </ul>
         </div>
 
-        <div className="hidden items-center gap-6 md:flex">
-          <a href="#team" className="text-sm text-gray-300 transition hover:text-white">
+        <div className="hidden items-center gap-4 min-[640px]:flex">
+          <a href="#team" className="text-base text-[#d0d0d0] transition hover:text-white">
             Team
           </a>
           <a
             href="#contact"
-            className="rounded-md border border-laradama-brand px-4 py-2 text-sm font-medium text-laradama-brand transition hover:bg-laradama-brand/10"
+            className="border border-laradama-brand px-4 py-2 text-base font-medium text-laradama-brand transition hover:bg-laradama-brand/10"
           >
             Contact
           </a>
         </div>
 
         <button
-          className="text-white md:hidden"
+          className="text-white min-[640px]:hidden"
           onClick={() => setOpen(!open)}
           aria-label="Toggle menu"
         >
@@ -52,8 +52,8 @@ export default function Navbar() {
       </nav>
 
       {open && (
-        <div className="border-t border-white/10 px-8 py-4 md:hidden">
-          <ul className="flex flex-col gap-4 text-sm text-gray-300">
+        <div className="border-t border-white/10 px-8 py-4 min-[640px]:hidden">
+          <ul className="flex flex-col gap-4 text-base text-gray-300">
             {links.map((link) => (
               <li key={link.label}>
                 <a href={link.href}>{link.label}</a>
@@ -63,7 +63,7 @@ export default function Navbar() {
             <li>
               <a
                 href="#contact"
-                className="inline-block rounded-md border border-laradama-brand px-4 py-2 text-laradama-brand"
+                className="inline-block border border-laradama-brand px-4 py-2 text-laradama-brand"
               >
                 Contact
               </a>
