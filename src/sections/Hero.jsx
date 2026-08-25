@@ -168,7 +168,7 @@ export default function Hero() {
   return (
     <>
       <section className="relative overflow-hidden bg-[#121212]">
-      <div className="mx-auto grid max-w-295 grid-cols-1 items-center gap-14 px-8 pt-16 pb-24 xl:grid-cols-2">
+      <div className="mx-auto grid max-w-295 grid-cols-1 items-center gap-10 px-8 pt-16 pb-24 xl:grid-cols-2">
         {/* Left copy */}
         <div>
           <span className="inline-flex items-center gap-2 rounded-none border border-laradama-brand/25 bg-laradama-brand/10 px-3 py-1.5 font-mono text-xs tracking-[0.02em] text-laradama-brand">
