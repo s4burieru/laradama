@@ -3,7 +3,7 @@ import { Upload } from "lucide-react";
 export default function Cta() {
   return (
     <section id="upload" className="border-t border-white/10 bg-[#121212]">
-      <div className="mx-auto max-w-295 px-8 py-24 text-center">
+      <div className="mx-auto max-w-375 px-8 py-24 text-center">
         <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
           Give your next photo a soundtrack.
         </h2>

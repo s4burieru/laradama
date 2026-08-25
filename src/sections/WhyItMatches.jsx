@@ -8,9 +8,9 @@ const matchedTrack = {
 export default function WhyItMatches() {
   return (
     <section id="why" className="bg-[#121212] border-t border-laradama-line py-24">
-      <div className="mx-auto grid max-w-295 grid-cols-[0.85fr_1.15fr] items-center gap-14 px-8 max-[900px]:grid-cols-1">
+      <div className="mx-auto grid max-w-295 grid-cols-2 items-center gap-14 px-8 max-[900px]:grid-cols-1">
         {/* Why-it-matched mock card */}
-        <div className="border border-laradama-brand bg-laradama-card p-5.5">
+        <div className="border border-laradama-brand bg-laradama-elevated p-5.5">
           <div className="mb-4.5 flex items-center gap-3.5">
             <div className="h-14 w-14 shrink-0 bg-[linear-gradient(135deg,#1ED760,#0f8a3f)]" />
             <div>
@@ -38,11 +38,11 @@ export default function WhyItMatches() {
         </div>
 
         {/* Explanation copy */}
-        <div>
+        <div className="mx-auto max-w-140 ">
           <h2 className="mb-4 font-display text-[34px] font-bold leading-tight text-laradama-brand">
             Not just a match — a reason.
           </h2>
-          <p className="mb-5.5 max-w-120 text-base leading-[1.65] text-laradama-dim">
+          <p className="mb-5.5 text-base leading-[1.65] text-laradama-dim">
             Every pick comes with a plain-language explanation: what Laradama saw in your image, and
             what it heard in the track that made the pairing click. It&apos;s a second layer once you
             keep a song — read the mood behind the mix, or learn something new about the track
