@@ -4,8 +4,15 @@ import HowItWorks from "./sections/HowItWorks";
 import WhyItMatches from "./sections/WhyItMatches";
 import Cta from "./sections/Cta";
 import Footer from "./components/Footer";
+import TeamPage from "./pages/TeamPage";
 
 export default function App() {
+  const path = window.location.pathname;
+
+  if (path === "/team") {
+    return <TeamPage />;
+  }
+
   return (
     <div className="min-h-screen bg-black font-sans text-white">
       <Navbar />

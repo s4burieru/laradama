@@ -2,7 +2,7 @@ import { useState } from "react";
 
 const links = [
   { label: "About Laradama", href: "#about" },
-    { label: "How to Use", href: "#how-it-works" },
+  { label: "How to Use", href: "#how-it-works" },
   { label: "Features", href: "#features" },
 ];
 
@@ -13,7 +13,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 mx-0 h-20 w-full border-b border-[#808080] bg-[#121212]">
       <nav className="mx-auto flex h-full max-w-375 items-center justify-between px-4 md:px-8">
         <div className="flex items-center gap-10">
-          <a href="#" className="flex shrink-0 items-center gap-4 text-[36px] font-bold">
+          <a href="/" className="flex shrink-0 items-center gap-4 text-[36px] font-bold">
             <img src="/laradama-logo.png" alt="Laradama logo" className="h-12 w-12 object-cover" />
           </a>
 
@@ -29,7 +29,7 @@ export default function Navbar() {
         </div>
 
         <div className="hidden items-center gap-4 min-[640px]:flex">
-          <a href="#team" className="text-base text-[#d0d0d0] transition hover:text-white">
+          <a href="/team" className="text-base text-[#d0d0d0] transition hover:text-white">
             Team
           </a>
           <a
@@ -59,7 +59,9 @@ export default function Navbar() {
                 <a href={link.href}>{link.label}</a>
               </li>
             ))}
-            <li><a href="#team">Team</a></li>
+            <li>
+              <a href="/team">Team</a>
+            </li>
             <li>
               <a
                 href="#contact"
