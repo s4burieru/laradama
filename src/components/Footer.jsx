@@ -11,7 +11,7 @@ const socials = [
 
 export default function Footer() {
   return (
-      <footer className="relative m-0 w-full overflow-hidden border-y border-[#808080] bg-[#121212] text-[#e9e9e9] font-sans">
+      <footer className="relative m-0 w-full overflow-hidden border-t border-[#808080] bg-[#121212] text-[#e9e9e9] font-sans">
       <div className="mx-auto grid h-95 w-full max-w-375 grid-cols-[36%_27%_37%] box-border px-2 max-[640px]:h-auto max-[640px]:grid-cols-1 max-[640px]:px-0">
         <section className="min-w-0 p-[56px_0_10px_16px] max-[1024px]:pl-4 max-[640px]:border-[#808080] max-[640px]:p-[26px_24px_20px] max-[640px]:border-t-0">
           <div className="flex items-center gap-4 text-[28px] font-bold">
