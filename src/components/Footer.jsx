@@ -16,7 +16,7 @@ export default function Footer() {
         <section className="min-w-0 p-[56px_0_10px_16px] max-[1024px]:pl-4 max-[640px]:border-[#808080] max-[640px]:p-[26px_24px_20px] max-[640px]:border-t-0">
           <div className="flex items-center gap-4 text-[28px] font-bold">
             <img className="h-12 w-12 object-cover" src="/laradama-logo.png" alt="Laradama logo" />
-            <span>laradama.ai</span>
+            <span>laradama.app</span>
           </div>
           <div className="mt-3.25 h-px bg-[#808080]" />
           <ul className="mt-24 grid list-none gap-2.5 p-0 text-[14px] text-[#8e8e8e]">
@@ -44,7 +44,7 @@ export default function Footer() {
 
           <div className="relative z-2 mt-auto grid h-16.25 grid-cols-[63%_37%] items-center text-[12px] leading-[1.4] text-[#8e8e8e] max-[1100px]:h-auto max-[1100px]:grid-cols-1 max-[1100px]:gap-3 max-[1100px]:p-[18px_24px_18px_0]">
             <div className="flex items-center gap-2.5 max-[1100px]:pl-0">
-              <p className="m-0 text-[12px]">© 2026 laradama.ai</p>
+              <p className="m-0 text-[12px]">© 2026 laradama.app</p>
               <span className="text-[#808080]" aria-hidden="true">•</span>
               <a className="m-0 border-0 bg-transparent p-0 text-inherit no-underline" href="#">Privacy</a>
               <span className="text-[#808080]" aria-hidden="true">•</span>

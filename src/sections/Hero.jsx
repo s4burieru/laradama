@@ -168,34 +168,34 @@ export default function Hero() {
   return (
     <>
       <section className="relative overflow-hidden bg-[#121212]">
-      <div className="mx-auto grid max-w-295 grid-cols-1 items-center gap-10 px-8 pt-16 pb-24 xl:grid-cols-2">
+      <div className="mx-auto grid max-w-295 grid-cols-1 items-center gap-10 px-6 pt-16 pb-24 sm:px-8 xl:grid-cols-2">
         {/* Left copy */}
         <div>
           <span className="inline-flex items-center gap-2 rounded-none border border-laradama-brand/25 bg-laradama-brand/10 px-3 py-1.5 font-mono text-xs tracking-[0.02em] text-laradama-brand">
             <span className="inline-block h-1.5 w-1.5 animate-pulse-dot rounded-none bg-laradama-brand" />
             NOW MATCHING TRENDING TRACKS
           </span>
-          <h1 className="mt-6 font-display text-5xl font-bold leading-[1.04] tracking-[-0.02em] text-laradama-ink xl:text-6xl">
+          <h1 className="mt-6 font-display text-4xl font-bold leading-[1.1] tracking-[-0.02em] text-laradama-ink sm:text-5xl sm:leading-[1.04] xl:text-6xl">
             Every image <br />
             has a <span className="text-laradama-brand">soundtrack.</span>
           </h1>
           <p className="mt-6 max-w-120 text-lg leading-relaxed text-laradama-dim">
-            Upload or capture a photo. Laradama AI reads its mood, color, and
+            Upload or capture a photo. Laradama App reads its mood, color, and
             motion, then matches it to a trending song — instantly. Don't like
             the pick? Swipe for another.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-4">
+          <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               type="button"
               onClick={openFilePicker}
-              className="inline-flex items-center gap-2.5 rounded-none bg-laradama-brand px-6 py-3.5 text-[15.5px] font-bold text-[#06170C] transition hover:-translate-y-0.5 hover:bg-laradama-brand-hover"
+              className="inline-flex w-full items-center justify-center gap-2.5 rounded-none bg-laradama-brand px-6 py-3.5 text-[15.5px] font-bold text-[#06170C] transition hover:-translate-y-0.5 hover:bg-laradama-brand-hover sm:w-auto"
             >
               <Plus size={17} strokeWidth={2.4} /> Upload a photo
             </button>
             <button
               type="button"
               onClick={watchMatch}
-              className="inline-flex items-center gap-2 rounded-none border border-laradama-line px-6 py-3 text-[15px] font-semibold text-laradama-ink transition hover:border-laradama-dimmer hover:bg-laradama-elevated"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-none border border-laradama-line px-6 py-3 text-[15px] font-semibold text-laradama-ink transition hover:border-laradama-dimmer hover:bg-laradama-elevated sm:w-auto"
             >
               Watch it match <ArrowRight size={16} />
             </button>
@@ -204,7 +204,7 @@ export default function Hero() {
           <p className="mt-3 font-mono text-xs tracking-[0.02em] text-laradama-dimmer">
             Try it — pick any photo, your match updates live in the demo →
           </p>
-          <div className="mt-10 flex gap-7">
+          <div className="mt-10 grid grid-cols-3 gap-x-4 gap-y-6 sm:gap-x-7">
             {stats.map((s) => (
               <div key={s.label} className="flex flex-col gap-0.5">
                 <span className="font-display text-[22px] font-bold text-laradama-ink">{s.value}</span>

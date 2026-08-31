@@ -198,7 +198,7 @@ export default function TeamPage() {
           </div>
 
           <div className="mt-12 w-full border border-[#808080] bg-[#121212] p-2 sm:p-4">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {teamMembers.map((member) => (
                 <article
                   key={member.name}
