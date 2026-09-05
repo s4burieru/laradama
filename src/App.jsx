@@ -5,12 +5,17 @@ import WhyItMatches from "./sections/WhyItMatches";
 import Cta from "./sections/Cta";
 import Footer from "./components/Footer";
 import TeamPage from "./pages/TeamPage";
+import ContactPage from "./pages/ContactPage";
 
 export default function App() {
   const path = window.location.pathname;
 
   if (path === "/team") {
     return <TeamPage />;
+  }
+
+  if (path === "/contact") {
+    return <ContactPage />;
   }
 
   return (

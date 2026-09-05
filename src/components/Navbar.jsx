@@ -50,7 +50,7 @@ export default function Navbar() {
             Team
           </a>
           <a
-            href="#contact"
+            href="/contact"
             className="border border-laradama-brand px-4 py-2 text-base font-medium text-laradama-brand transition hover:bg-laradama-brand/10"
           >
             Contact
@@ -98,7 +98,7 @@ export default function Navbar() {
             </li>
             <li className="px-4 pt-6">
               <a
-                href="#contact"
+                href="/contact"
                 onClick={() => setOpen(false)}
                 className="flex items-center justify-center border border-laradama-brand px-4 py-3.5 text-base font-medium text-laradama-brand transition hover:bg-laradama-brand/10"
               >
