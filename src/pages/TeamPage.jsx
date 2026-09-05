@@ -184,13 +184,13 @@ export default function TeamPage() {
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <a
                 className="inline-flex items-center gap-2 border border-laradama-brand px-5 py-3 text-sm font-semibold text-laradama-brand transition hover:bg-laradama-brand/10"
-                href="#contact"
+                href="/contact"
               >
                 Apply Now <span aria-hidden="true">→</span>
               </a>
               <a
                 className="inline-flex items-center gap-2 bg-laradama-brand px-5 py-3 text-sm font-semibold text-[#06170c] transition hover:bg-laradama-brand-hover"
-                href="#contact"
+                href="/contact"
               >
                 Contact Us <span aria-hidden="true">→</span>
               </a>

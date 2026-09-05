@@ -40,7 +40,7 @@ export default function Footer() {
         {/* CTA */}
         <section className="relative z-1 flex min-w-0 flex-col overflow-hidden border-l border-[#808080] p-[56px_16px] pl-6.5 max-[640px]:border-l-0 max-[640px]:border-t max-[640px]:border-[#808080] max-[640px]:p-6">
           <p className="relative z-2 m-0 text-[28px] font-light leading-[1.35] text-[#a8a8a8] max-[640px]:text-[24px] max-[640px]:leading-[1.3]">What song matches<br />your moment?</p>
-          <a className="relative z-2 mt-3.5 inline-flex w-75 max-w-full justify-between border border-laradama-brand px-5 py-3 text-[16px] text-laradama-brand no-underline transition-colors hover:bg-[rgba(30,215,96,0.1)] max-[640px]:w-full" href="#upload">Get in touch <span aria-hidden="true">→</span></a>
+          <a className="relative z-2 mt-3.5 inline-flex w-75 max-w-full justify-between border border-laradama-brand px-5 py-3 text-[16px] text-laradama-brand no-underline transition-colors hover:bg-[rgba(30,215,96,0.1)] max-[640px]:w-full" href="/contact">Get in touch <span aria-hidden="true">→</span></a>
 
           <div className="relative z-2 mt-auto grid h-16.25 grid-cols-[63%_37%] items-center text-[12px] leading-[1.4] text-[#8e8e8e] max-[1100px]:h-auto max-[1100px]:grid-cols-1 max-[1100px]:gap-3 max-[1100px]:p-[18px_24px_18px_0]">
             <div className="flex items-center gap-2.5 max-[1100px]:pl-0">
