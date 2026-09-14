@@ -49,9 +49,9 @@ export default function Footer() {
       <footer className="relative m-0 w-full overflow-hidden border-t border-[#808080] bg-[#121212] text-[#e9e9e9] font-sans">
       <div className="mx-auto grid h-95 w-full max-w-375 grid-cols-[36%_27%_37%] box-border px-2 max-[640px]:h-auto max-[640px]:grid-cols-1 max-[640px]:px-0">
         <section className="min-w-0 p-[56px_0_10px_16px] max-[1024px]:pl-4 max-[640px]:border-[#808080] max-[640px]:p-[26px_24px_20px] max-[640px]:border-t-0">
-          <div className="flex items-center gap-4 text-[28px] font-bold">
-            <img className="h-12 w-12 object-cover" src="/laradama-logo.png" alt="Laradama logo" />
-            <span>laradama.app</span>
+          <div className="flex items-center gap-3 font-bold text-[clamp(18px,2.8vw,28px)] min-[1024px]:gap-4 min-[1024px]:text-[28px] max-[640px]:gap-4 max-[640px]:text-[22px]">
+            <img className="h-10 w-10 shrink-0 object-cover min-[1024px]:h-12 min-[1024px]:w-12 max-[640px]:h-12 max-[640px]:w-12" src="/laradama-logo.png" alt="Laradama logo" />
+            <span className="shrink-0 whitespace-nowrap">laradama.app</span>
           </div>
           <div className="mt-3.25 h-px bg-[#808080]" />
           <ul className="mt-24 grid list-none gap-2.5 p-0 text-[14px] text-[#8e8e8e]">

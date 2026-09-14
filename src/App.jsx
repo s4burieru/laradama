@@ -6,6 +6,7 @@ import Cta from "./sections/Cta";
 import Footer from "./components/Footer";
 import TeamPage from "./pages/TeamPage";
 import ContactPage from "./pages/ContactPage";
+import AboutPage from "./pages/AboutPage";
 
 export default function App() {
   const path = window.location.pathname;
@@ -16,6 +17,10 @@ export default function App() {
 
   if (path === "/contact") {
     return <ContactPage />;
+  }
+
+  if (path === "/about") {
+    return <AboutPage />;
   }
 
   return (
