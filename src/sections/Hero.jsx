@@ -7,7 +7,7 @@ const skinTabs = [
   { id: "float", label: "Floating" },
 ];
 
-const songs = [
+export const songs = [
   {
     title: "Golden Hour Drift",
     artist: "Wren Solace",
@@ -38,7 +38,7 @@ const songs = [
   },
 ];
 
-const templates = [
+export const storyTemplates = [
   { id: "clean", label: "Clean" },
   { id: "meme", label: "Meme" },
   { id: "vinyl", label: "Vinyl" },
@@ -79,6 +79,26 @@ const FacebookIcon = () => (
     />
   </svg>
 );
+
+export function renderStoryTemplate(s, id, uploadedImage = null) {
+  const bg = uploadedImage
+    ? `background-image:url(${uploadedImage})`
+    : `background:${s.gradient}`;
+  if (id === "clean") {
+    return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-story-scrim-b"></div><div class="ld-story-wm"><span class="ld-dotmark"></span>Laradama</div><div class="ld-story-info"><div class="ld-story-title">${s.title}</div><div class="ld-story-artist">${s.artist} · trending now</div></div>`;
+  }
+  if (id === "meme") {
+    return `<div class="ld-story-bg contain" style="${bg}"></div><div class="ld-meme-bar top">my photo's soundtrack is</div><div class="ld-meme-bar bottom">${s.title}</div>`;
+  }
+  if (id === "vinyl") {
+    return `<div class="ld-story-bg blurbg" style="${bg}"></div><div class="ld-vinyl-disc"><div class="ld-vinyl-photo" style="${bg}"></div><div class="ld-vinyl-grooves"></div><div class="ld-vinyl-hole"></div></div><div class="ld-vinyl-caption">${s.title} — ${s.artist}</div><div class="ld-story-wm corner"><span class="ld-dotmark"></span>laradama.ai</div>`;
+  }
+  if (id === "neon") {
+    return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-neon-duotone"></div><div class="ld-neon-eq">${"<span></span>".repeat(7)}</div><div class="ld-neon-title">${s.title}</div><div class="ld-neon-wm-strip">LARADAMA.AI &nbsp;•&nbsp; LARADAMA.AI &nbsp;•&nbsp; LARADAMA.AI</div>`;
+  }
+  return "";
+}
+
 export default function Hero() {
   const fileInputRef = useRef(null);
   const demoRef = useRef(null);
@@ -123,24 +143,7 @@ export default function Hero() {
     demoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const templateInner = (s, id) => {
-    const bg = uploadedImage
-      ? `background-image:url(${uploadedImage})`
-      : `background:${s.gradient}`;
-    if (id === "clean") {
-      return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-story-scrim-b"></div><div class="ld-story-wm"><span class="ld-dotmark"></span>Laradama</div><div class="ld-story-info"><div class="ld-story-title">${s.title}</div><div class="ld-story-artist">${s.artist} · trending now</div></div>`;
-    }
-    if (id === "meme") {
-      return `<div class="ld-story-bg contain" style="${bg}"></div><div class="ld-meme-bar top">my photo's soundtrack is</div><div class="ld-meme-bar bottom">${s.title}</div>`;
-    }
-    if (id === "vinyl") {
-      return `<div class="ld-story-bg blurbg" style="${bg}"></div><div class="ld-vinyl-disc"><div class="ld-vinyl-photo" style="${bg}"></div><div class="ld-vinyl-grooves"></div><div class="ld-vinyl-hole"></div></div><div class="ld-vinyl-caption">${s.title} — ${s.artist}</div><div class="ld-story-wm corner"><span class="ld-dotmark"></span>laradama.ai</div>`;
-    }
-    if (id === "neon") {
-      return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-neon-duotone"></div><div class="ld-neon-eq">${"<span></span>".repeat(7)}</div><div class="ld-neon-title">${s.title}</div><div class="ld-neon-wm-strip">LARADAMA.AI &nbsp;•&nbsp; LARADAMA.AI &nbsp;•&nbsp; LARADAMA.AI</div>`;
-    }
-    return "";
-  };
+  const templateInner = (s, id) => renderStoryTemplate(s, id, uploadedImage);
 
   const openStoryModal = (platform) => {
     setCurrentPlatform(platform);
@@ -151,7 +154,7 @@ export default function Hero() {
   const closeStoryModal = () => setModalOpen(false);
 
   const handleShare = () => {
-    const t = templates.find((x) => x.id === currentTemplate);
+    const t = storyTemplates.find((x) => x.id === currentTemplate);
     alert(
       `This would post the "${t.label}" Story — your photo, "${song.title}" by ${song.artist}, and the Laradama watermark — to your ${currentPlatform} Story.`,
     );
@@ -373,7 +376,7 @@ export default function Hero() {
             dangerouslySetInnerHTML={{ __html: templateInner(song, currentTemplate) }}
           />
           <div className="ld-template-grid" id="templateGrid">
-            {templates.map((t) => (
+            {storyTemplates.map((t) => (
               <div
                 key={t.id}
                 className={`ld-thumb-wrap${currentTemplate === t.id ? " selected" : ""}`}

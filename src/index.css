@@ -28,6 +28,17 @@
     }
   }
 }
+.feature-landscape::after { content: ""; position: absolute; inset: auto 0 0; height: 22%; background: repeating-linear-gradient(170deg, transparent 0 14px, rgba(255,255,255,.06) 15px 16px); opacity: .7; }
+.feature-template { position: relative; aspect-ratio: 9 / 16; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 1px solid #383838; background: #202020; }
+.feature-template::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(0,0,0,.62)); }
+.feature-template-copy { position: relative; z-index: 1; max-width: 88%; color: white; font-family: var(--font-display); font-size: clamp(9px, 1.2vw, 14px); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.feature-template-watermark { position: absolute; z-index: 1; bottom: 6%; color: rgba(255,255,255,.7); font-family: var(--font-mono); font-size: 7px; letter-spacing: .12em; }
+.feature-template-glow { background: radial-gradient(circle at 50% 28%, #ffcf9c 0, #fa686d 37%, #45142f 100%); }
+.feature-template-meme { background: linear-gradient(155deg, #ff8d7d, #ef426f); }
+.feature-template-meme::after { content: "MOMENTS HIT DIFFERENT"; position: absolute; top: 8%; left: 0; right: 0; background: white; color: #141414; font-family: var(--font-display); font-size: 7px; font-weight: 800; padding: 4px 2px; }
+.feature-template-vinyl { background: linear-gradient(145deg, #fa766c, #de4664); }
+.feature-template-vinyl::after { content: ""; position: absolute; width: 59%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, #ff8676 0 7%, #202020 8% 11%, #313131 12% 14%, #171717 15% 100%); box-shadow: 0 5px 15px #101010; }
+.feature-template-neon { background: linear-gradient(145deg, #a8c86d, #c77969 55%, #37384a); }
 /* ============================================================
    HERO DEVICE DEMO — Laradama
    ============================================================ */

@@ -1,6 +1,11 @@
 import { Mail, MapPin, Phone } from "lucide-react";
 
-const nav = ["About", "Features", "How to Use", "Team"];
+const nav = [
+  { label: "About", href: "/about" },
+  { label: "Features", href: "/features" },
+  { label: "How to Use", href: "/#how-it-works" },
+  { label: "Team", href: "/team" },
+];
 
 const socialIcons = {
   linkedin: (
@@ -65,8 +70,8 @@ export default function Footer() {
         <nav className="min-w-0 border-l border-[#808080] pt-14 pb-7.75 max-[640px]:border-l-0 max-[640px]:border-t max-[640px]:border-[#808080] max-[640px]:p-6" aria-label="Footer navigation">
           <ul className="m-0 grid list-none gap-3.5 border-b border-[#808080] p-0 pb-7.75">
             {nav.map((item) => (
-              <li key={item} className="ml-6.5 max-[640px]:ml-0">
-                <a className="text-[16px] text-[#c5c5c5] no-underline transition-colors duration-150 ease-in-out hover:text-laradama-brand" href="#">{item}</a>
+              <li key={item.label} className="ml-6.5 max-[640px]:ml-0">
+                <a className="text-[16px] text-[#c5c5c5] no-underline transition-colors duration-150 ease-in-out hover:text-laradama-brand" href={item.href}>{item.label}</a>
               </li>
             ))}
           </ul>
