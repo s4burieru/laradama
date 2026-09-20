@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 const links = [
   { label: "About Laradama", href: "/about" },
   { label: "How to Use", href: "#how-it-works" },
-  { label: "Features", href: "#features" },
+  { label: "Features", href: "/features" },
 ];
 
 export default function Navbar() {

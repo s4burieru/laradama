@@ -7,6 +7,7 @@ import Footer from "./components/Footer";
 import TeamPage from "./pages/TeamPage";
 import ContactPage from "./pages/ContactPage";
 import AboutPage from "./pages/AboutPage";
+import FeaturesPage from "./pages/FeaturesPage";
 
 export default function App() {
   const path = window.location.pathname;
@@ -21,6 +22,10 @@ export default function App() {
 
   if (path === "/about") {
     return <AboutPage />;
+  }
+
+  if (path === "/features") {
+    return <FeaturesPage />;
   }
 
   return (
