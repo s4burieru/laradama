@@ -1,3 +1,4 @@
+import IntroSplash from "./components/IntroSplash";
 import Navbar from "./components/Navbar";
 import Hero from "./sections/Hero";
 import HowItWorks from "./sections/HowItWorks";
@@ -12,30 +13,28 @@ import FeaturesPage from "./pages/FeaturesPage";
 export default function App() {
   const path = window.location.pathname;
 
+  let page;
   if (path === "/team") {
-    return <TeamPage />;
+    page = <TeamPage />;
+  } else if (path === "/contact") {
+    page = <ContactPage />;
+  } else if (path === "/about") {
+    page = <AboutPage />;
+  } else if (path === "/features") {
+    page = <FeaturesPage />;
+  } else {
+    page = (
+      <div className="min-h-screen bg-black font-sans text-white">
+        <IntroSplash />
+        <Navbar />
+        <Hero />
+        <HowItWorks />
+        <WhyItMatches />
+        <Cta />
+        <Footer />
+      </div>
+    );
   }
 
-  if (path === "/contact") {
-    return <ContactPage />;
-  }
-
-  if (path === "/about") {
-    return <AboutPage />;
-  }
-
-  if (path === "/features") {
-    return <FeaturesPage />;
-  }
-
-  return (
-    <div className="min-h-screen bg-black font-sans text-white">
-      <Navbar />
-      <Hero />
-      <HowItWorks />
-      <WhyItMatches />
-      <Cta />
-      <Footer />
-    </div>
-  );
+  return page;
 }

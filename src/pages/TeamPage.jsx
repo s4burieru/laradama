@@ -22,22 +22,22 @@ const teamMembers = [
     role: "PM & Full-stack Developer",
     image: sabrielImage,
     socials: [
-      { label: "Github", href: "#", icon: "github" },
-      { label: "LinkedIn", href: "#", icon: "linkedin" },
-      { label: "Website", href: "#", icon: "website" },
-      { label: "Facebook", href: "#", icon: "facebook" },
-      { label: "Instagram", href: "#", icon: "instagram" },
+      { label: "Github", href: "https://github.com/s4burieru", icon: "github" },
+      { label: "LinkedIn", href: "https://www.linkedin.com/in/sabrieladriel/", icon: "linkedin" },
+      { label: "Website", href: "https://www.sabrieladriel.dev/", icon: "website" },
+      { label: "Facebook", href: "https://www.facebook.com/sabrieladriel", icon: "facebook" },
+      { label: "Instagram", href: "https://www.instagram.com/sabrieladriel/", icon: "instagram" },
     ],
   },
   {
     name: "Aeron Christopher Martinez",
-    role: "UI/UX & Front-end Developer",
+    role: "Technical Support & Developer",
     image: aeronImage,
     socials: [
-      { label: "Github", href: "#", icon: "github" },
-      { label: "LinkedIn", href: "#", icon: "linkedin" },
-      { label: "Facebook", href: "#", icon: "facebook" },
-      { label: "Instagram", href: "#", icon: "instagram" },
+      { label: "Github", href: "https://github.com/mrtinezaern-dev", icon: "github" },
+      { label: "LinkedIn", href: "https://www.linkedin.com/in/aeron-christopher-martinez-2753a43bb/", icon: "linkedin" },
+      { label: "Facebook", href: "https://www.facebook.com/aeron.martinez.315", icon: "facebook" },
+      { label: "Instagram", href: "https://www.instagram.com/aer_nmrtnz/", icon: "instagram" },
     ],
   },
   {
@@ -45,9 +45,9 @@ const teamMembers = [
     role: "Technical Support & Developer",
     image: emersonImage,
     socials: [
-      { label: "Github", href: "#", icon: "github" },
-      { label: "Facebook", href: "#", icon: "facebook" },
-      { label: "Instagram", href: "#", icon: "instagram" },
+      { label: "Github", href: "https://github.com/slvdrchrisss-dev", icon: "github" },
+      { label: "Facebook", href: "https://www.facebook.com/profile.php?id=100079758992896", icon: "facebook" },
+      { label: "Instagram", href: "https://www.instagram.com/_chrssz/", icon: "instagram" },
     ],
   },
   {
@@ -55,9 +55,9 @@ const teamMembers = [
     role: "Technical Support & Developer",
     image: khingImage,
     socials: [
-      { label: "Github", href: "#", icon: "github" },
-      { label: "Facebook", href: "#", icon: "facebook" },
-      { label: "Instagram", href: "#", icon: "instagram" },
+      { label: "Github", href: "https://github.com/KhingUlpato", icon: "github" },
+      { label: "Facebook", href: "https://www.facebook.com/profile.php?id=61592900919828", icon: "facebook" },
+      { label: "Instagram", href: "https://www.instagram.com/kquierre/", icon: "instagram" },
     ],
   },
 ];

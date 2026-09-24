@@ -87,8 +87,8 @@ export default function TrendingMusicPlayer() {
   };
 
   return (
-    <div ref={wrapperRef} className="mx-auto w-full max-w-[1180px] text-left">
-      <div className="bg-[#151515] px-5 py-5 sm:px-8 sm:py-6">
+    <div ref={wrapperRef} className="mx-auto w-full max-w-295 text-left">
+      <div className="border border-[#808080] bg-[#151515] px-5 py-5 sm:px-8 sm:py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-laradama-brand sm:text-xs">
             <span className="inline-block h-1.5 w-1.5 animate-pulse-dot bg-laradama-brand" />
