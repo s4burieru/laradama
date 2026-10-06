@@ -1,11 +1,9 @@
-import { useRef, useState } from "react";
-import { ArrowRight, Plus } from "lucide-react";
-
-const skinTabs = [
-  { id: "phone", label: "Phone" },
-  { id: "browser", label: "Browser" },
-  { id: "float", label: "Floating" },
-];
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, FastForward, Pause, Play, Plus, SkipForward } from "lucide-react";
+import { findMoreSongs, matchImageToTracks } from "../lib/match.js";
+import { spotifySearchUrl } from "../lib/spotify.js";
+import { renderStoryImage } from "../lib/storyImage.js";
+import { canShareFiles, downloadStoryFile, shareStoryFile } from "../lib/storyShare.js";
 
 export const songs = [
   {
@@ -80,6 +78,43 @@ const FacebookIcon = () => (
   </svg>
 );
 
+const fmtTime = (s) =>
+  Number.isFinite(s) && s >= 0
+    ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`
+    : "";
+
+/**
+ * Warms the browser cache for a track URL with a throwaway element, so that
+ * when the card switches to that track playback starts from memory instead of
+ * waiting on the network. Entries stay alive for the whole session on purpose.
+ */
+const warmedAudio = new Map();
+const warmAudio = (url) => {
+  if (!url || warmedAudio.has(url)) return;
+  try {
+    const a = new Audio();
+    a.preload = "auto";
+    a.src = url;
+    warmedAudio.set(url, a);
+  } catch {
+    /* no Audio support → playback still works, just not pre-buffered */
+  }
+};
+
+/**
+ * Track length to show/seek against. Some streamers never report a duration
+ * (Infinity), so fall back to how far the media has actually buffered — that
+ * keeps the progress bar and the transport controls usable either way.
+ */
+const effectiveDuration = (el) => {
+  if (Number.isFinite(el.duration) && el.duration > 0) return el.duration;
+  const buffered = el.buffered;
+  return buffered && buffered.length ? buffered.end(buffered.length - 1) : 0;
+};
+
+/** Dedupe key for a deck entry — must match the music layer's candidate keys. */
+const trackKey = (s) => `${String(s?.title || "").toLowerCase()}::${String(s?.artist || "").toLowerCase()}`;
+
 export function renderStoryTemplate(s, id, uploadedImage = null) {
   const bg = uploadedImage
     ? `background-image:url(${uploadedImage})`
@@ -105,38 +140,257 @@ export default function Hero() {
 
   const [idx, setIdx] = useState(0);
   const [uploadedImage, setUploadedImage] = useState(null);
-  const [skin, setSkin] = useState("phone");
   const [swipeDir, setSwipeDir] = useState(null);
   const [whyOpen, setWhyOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentTemplate, setCurrentTemplate] = useState("clean");
   const [currentPlatform, setCurrentPlatform] = useState("Instagram");
+  // Share/export outcome shown under the modal's buttons. `working` is the only
+  // busy phase — everything else is a terminal message the user can read.
+  const [share, setShare] = useState({ phase: "idle", message: "" });
+  const [matches, setMatches] = useState([]);
+  const [status, setStatus] = useState("idle"); // idle | analyzing | ready
+  const [progress, setProgress] = useState({ current: 0, duration: 0 });
+  const [playing, setPlaying] = useState(false);
+  const [buffering, setBuffering] = useState(false);
+  const [fetchingMore, setFetchingMore] = useState(false);
 
-  const song = songs[idx];
+  const audioRef = useRef(null);
+  const matchIdRef = useRef(0);
+  // True while playback *should* be on — survives autoplay blocks so we can
+  // retry the moment the browser allows it (first interaction / buffered data).
+  const wantPlayRef = useRef(true);
+  // Deck refill state: the analysis profile of the current photo, every track
+  // key already shown, how many refill batches have run, and whether the free
+  // sources are exhausted for this photo.
+  const analysisRef = useRef(null);
+  const seenRef = useRef(new Set());
+  const batchRef = useRef(0);
+  const moreRef = useRef(false);
+  const exhaustedRef = useRef(false);
+  const emptyRef = useRef(0);
+
+  const pool = matches.length ? matches : songs;
+  const song = pool[idx % pool.length];
+  const analyzing = status === "analyzing";
+  const hasAudio = Boolean(song.audioUrl) && !analyzing;
+  const progressPct =
+    hasAudio && progress.duration > 0
+      ? `${Math.min(100, (progress.current / progress.duration) * 100)}%`
+      : hasAudio
+        ? "0%"
+        : "34%";
+
+  // Small readout next to the transport buttons.
+  let statusLabel = "paused";
+  if (!hasAudio) statusLabel = analyzing ? "matching…" : fetchingMore ? "loading more…" : "no audio";
+  else if (buffering) statusLabel = "buffering…";
+  else if (playing) statusLabel = "playing";
+  else if (fetchingMore) statusLabel = "loading more…";
 
   const openFilePicker = () => fileInputRef.current?.click();
+
+  /**
+   * Tops the deck up with tracks it has not shown yet, so "next" never reaches
+   * the end of the list. Runs in the background (start it while there are still
+   * a few songs of runway left) and gives up only after the sources come back
+   * empty twice for the same photo.
+   */
+  const prefetchMore = async () => {
+    const analysis = analysisRef.current;
+    if (!analysis || moreRef.current || exhaustedRef.current) return;
+    const matchId = matchIdRef.current;
+    moreRef.current = true;
+    setFetchingMore(true);
+    try {
+      const more = await findMoreSongs(analysis, [...seenRef.current], batchRef.current + 1);
+      if (matchId !== matchIdRef.current) return; // a newer upload superseded this one
+      batchRef.current += 1;
+      const fresh = more.filter((s) => s?.title && s?.audioUrl && !seenRef.current.has(trackKey(s)));
+      if (!fresh.length) {
+        emptyRef.current += 1;
+        if (emptyRef.current >= 2) exhaustedRef.current = true; // no more matches for this photo
+        return;
+      }
+      emptyRef.current = 0;
+      fresh.forEach((s) => seenRef.current.add(trackKey(s)));
+      setMatches((prev) => [...prev, ...fresh]);
+    } catch (err) {
+      console.warn("[match] could not refill the deck:", err); // network blip → retry on the next Next
+    } finally {
+      moreRef.current = false;
+      if (matchId === matchIdRef.current) setFetchingMore(false);
+    }
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      setUploadedImage(ev.target.result);
+      const dataUrl = ev.target.result;
+      const matchId = ++matchIdRef.current;
+      setUploadedImage(dataUrl);
       setIdx(0);
       setWhyOpen(false);
+      setMatches([]);
+      setStatus("analyzing");
+      // Reset the refill bookkeeping for the new photo.
+      analysisRef.current = null;
+      seenRef.current = new Set();
+      batchRef.current = 0;
+      exhaustedRef.current = false;
+      emptyRef.current = 0;
+      // Real match: vision AI → music sources → Spotify (all free tiers).
+      // On any failure `songs` comes back empty and the mock songs stay visible.
+      matchImageToTracks(dataUrl)
+        .then(({ songs: real, analysis }) => {
+          if (matchId !== matchIdRef.current) return; // a newer upload superseded this one
+          const list = real || [];
+          analysisRef.current = analysis || null;
+          seenRef.current = new Set(list.map(trackKey));
+          setMatches(list);
+          setStatus("ready");
+          prefetchMore(); // queue the next batch so the first "next" is instant
+        })
+        .catch((err) => {
+          console.warn("[match] falling back to demo songs:", err);
+          if (matchId !== matchIdRef.current) return;
+          setStatus("ready");
+        });
     };
     reader.readAsDataURL(file);
     e.target.value = "";
   };
 
+  /**
+   * One step forward through the deck. While there are still only a few songs
+   * of runway left, kick off a refill in the background — the list keeps
+   * growing, so "next" lands on a fresh track instead of wrapping around.
+   */
+  const advance = () => {
+    if (pool.length - idx <= 3) prefetchMore();
+    setIdx((i) => i + 1);
+    setWhyOpen(false);
+  };
+
   const handleSwipe = (dir) => {
-    if (swipeDir) return;
+    if (swipeDir || analyzing) return;
     setSwipeDir(dir);
     setTimeout(() => {
-      setIdx((i) => (i + 1) % songs.length);
-      setWhyOpen(false);
+      advance();
       setSwipeDir(null);
     }, 240);
+  };
+
+  // Keep the (invisible) audio element in sync with the currently shown match.
+  // The source is attached the instant a match is ready (with preload="auto")
+  // so sound starts without a warm-up hop, and the *next* track is fetched into
+  // the cache in parallel so swiping never waits on the network.
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    setProgress({ current: 0, duration: 0 });
+    const url = song.audioUrl || "";
+    if (url && !analyzing) {
+      wantPlayRef.current = true;
+      if (el.getAttribute("src") !== url) {
+        // Setting the src starts the fetch; play() then waits for the first
+        // frames — no extra load() call in between to restart the request.
+        el.setAttribute("src", url);
+      }
+      el.play().catch(() => {}); // autoplay blocked → retried below on canplay / first interaction
+      warmAudio(pool[(idx + 1) % pool.length]?.audioUrl);
+    } else {
+      wantPlayRef.current = false;
+      el.pause();
+      if (el.getAttribute("src")) {
+        el.removeAttribute("src");
+        el.load();
+      }
+    }
+  }, [song.audioUrl, analyzing, idx, matches, pool]);
+
+  // Chrome/Safari block the very first play() until the page has been touched
+  // once. Retry on the first pointer/key event so the music starts on its own.
+  useEffect(() => {
+    const onFirstGesture = () => {
+      const el = audioRef.current;
+      if (el && wantPlayRef.current && el.getAttribute("src") && el.paused) {
+        el.play().catch(() => {});
+      }
+      if (el && !el.paused) {
+        window.removeEventListener("pointerdown", onFirstGesture);
+        window.removeEventListener("keydown", onFirstGesture);
+      }
+    };
+    window.addEventListener("pointerdown", onFirstGesture);
+    window.addEventListener("keydown", onFirstGesture);
+    return () => {
+      window.removeEventListener("pointerdown", onFirstGesture);
+      window.removeEventListener("keydown", onFirstGesture);
+    };
+  }, []);
+
+  const startIfWanted = () => {
+    const el = audioRef.current;
+    if (el && wantPlayRef.current && el.getAttribute("src") && el.paused) {
+      el.play().catch(() => {});
+    }
+  };
+
+  const toggleAudio = () => {
+    const el = audioRef.current;
+    if (!el || !el.getAttribute("src")) return;
+    if (el.paused) {
+      wantPlayRef.current = true;
+      el.play().catch(() => {});
+    } else {
+      wantPlayRef.current = false;
+      el.pause();
+    }
+  };
+
+  const seekBy = (delta) => {
+    const el = audioRef.current;
+    if (!el || !el.getAttribute("src")) return;
+    const dur = effectiveDuration(el);
+    if (!dur) return;
+    const next = Math.min(dur, Math.max(0, el.currentTime + delta));
+    el.currentTime = next;
+    setProgress({ current: next, duration: dur });
+  };
+
+  const seekTo = (e) => {
+    const el = audioRef.current;
+    if (!el || !el.getAttribute("src")) return;
+    const dur = effectiveDuration(el);
+    if (!dur) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    el.currentTime = pct * dur;
+    setProgress({ current: el.currentTime, duration: dur });
+  };
+
+  const onProgressKeyDown = (e) => {
+    if (e.key === "ArrowRight") { e.preventDefault(); seekBy(5); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); seekBy(-5); }
+    else if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleAudio(); }
+  };
+
+  const nextTrack = () => {
+    if (swipeDir || analyzing) return;
+    advance();
+  };
+
+  const onAudioEnded = () => {
+    setPlaying(false);
+    nextTrack(); // keep the music going — roll straight into the next match
+  };
+
+  const onAudioTime = (e) => {
+    const el = e.currentTarget;
+    setProgress({ current: el.currentTime, duration: effectiveDuration(el) });
   };
 
   const watchMatch = () => {
@@ -145,20 +399,113 @@ export default function Hero() {
 
   const templateInner = (s, id) => renderStoryTemplate(s, id, uploadedImage);
 
+  // Escape closes the story modal (the ✕ and the overlay already do).
+  useEffect(() => {
+    if (!modalOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") setModalOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modalOpen]);
+
+  const shareBusy = share.phase === "working";
+  // Web Share only ships on mobile browsers — the primary button says so.
+  const shareSupported = useMemo(() => canShareFiles(), []);
+  const shareTone =
+    share.phase === "error"
+      ? " bad"
+      : share.phase === "downloaded" || share.phase === "shared"
+        ? " ok"
+        : "";
+
   const openStoryModal = (platform) => {
     setCurrentPlatform(platform);
     setCurrentTemplate("clean");
+    setShare({ phase: "idle", message: "" });
     setModalOpen(true);
   };
 
   const closeStoryModal = () => setModalOpen(false);
 
-  const handleShare = () => {
-    const t = storyTemplates.find((x) => x.id === currentTemplate);
-    alert(
-      `This would post the "${t.label}" Story — your photo, "${song.title}" by ${song.artist}, and the Laradama watermark — to your ${currentPlatform} Story.`,
-    );
-    closeStoryModal();
+  /**
+   * Story image render, pre-started while the modal is open.
+   *
+   * Rasterising 1080x1920 takes seconds — longer than browsers keep a click's
+   * user activation alive (5s), after which `navigator.share`, `window.open`
+   * and the `instagram://` jump are all refused. So the PNG renders in the
+   * background as soon as a template is showing, and the buttons below reuse
+   * it instead of rendering at click time.
+   */
+  const storyRenderRef = useRef(null); // { key, blob: Promise<Blob> }
+  const storyRenderSeqRef = useRef(0);
+  const [preparing, setPreparing] = useState(false);
+  const storyKey = `${currentTemplate}|${song?.title || ""}|${song?.artist || ""}|${uploadedImage ? uploadedImage.length : 0}`;
+
+  const startStoryRender = () => {
+    const pending = renderStoryImage({ song, templateId: currentTemplate, uploadedImage });
+    const seq = ++storyRenderSeqRef.current;
+    storyRenderRef.current = { key: storyKey, blob: pending };
+    setPreparing(true);
+    pending
+      .catch((err) => {
+        console.warn("[story] could not render the Story image:", err);
+        // drop the failed entry so the next click tries again
+        if (storyRenderRef.current?.blob === pending) storyRenderRef.current = null;
+      })
+      .finally(() => {
+        if (storyRenderSeqRef.current === seq) setPreparing(false);
+      });
+    return pending;
+  };
+
+  const storyBlob = () => {
+    const cached = storyRenderRef.current;
+    return cached && cached.key === storyKey ? cached.blob : startStoryRender();
+  };
+
+  // Pre-render while the modal shows a template (and whenever it changes).
+  useEffect(() => {
+    if (!modalOpen) return undefined;
+    storyBlob();
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen, storyKey]);
+
+  /** Reuse the pre-rendered PNG when it matches; render on demand otherwise. */
+  const renderStory = async () => {
+    setShare({ phase: "working", message: "Rendering your Story image…" });
+    return storyBlob();
+  };
+
+  const exportFailed = (err) => {
+    console.warn("[story] could not export the Story image:", err);
+    setShare({ phase: "error", message: "Couldn't render the Story image — try another template." });
+  };
+
+  const handleShare = async () => {
+    if (shareBusy) return;
+    try {
+      const blob = await renderStory();
+      const res = await shareStoryFile(blob, { platform: currentPlatform, song });
+      setShare({ phase: res.phase, message: res.message });
+      // Only a real share closes the modal — on the save-and-open path it stays
+      // up so the "open Instagram and pick this file" instructions are readable.
+      if (res.phase === "shared") closeStoryModal();
+    } catch (err) {
+      exportFailed(err);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (shareBusy) return;
+    try {
+      const blob = await renderStory();
+      const res = await downloadStoryFile(blob, { platform: currentPlatform });
+      setShare({ phase: res.phase, message: res.message });
+    } catch (err) {
+      exportFailed(err);
+    }
   };
 
   const swipeStyle = swipeDir
@@ -171,7 +518,7 @@ export default function Hero() {
   return (
     <>
       <section className="relative overflow-hidden bg-[#121212]">
-      <div className="mx-auto grid max-w-295 grid-cols-1 items-center gap-10 px-6 pt-16 pb-24 sm:px-8 xl:grid-cols-2">
+      <div className="mx-auto grid max-w-375 grid-cols-1 items-center gap-10 px-6 pt-16 pb-24 sm:px-8 xl:grid-cols-[1.1fr_1.6fr]">
         {/* Left copy */}
         <div>
           <span className="inline-flex items-center gap-2 rounded-none border border-laradama-brand/25 bg-laradama-brand/10 px-3 py-1.5 font-mono text-xs tracking-[0.02em] text-laradama-brand">
@@ -204,6 +551,20 @@ export default function Hero() {
             </button>
           </div>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+          <audio
+            ref={audioRef}
+            hidden
+            preload="auto"
+            onTimeUpdate={onAudioTime}
+            onLoadedMetadata={onAudioTime}
+            onDurationChange={onAudioTime}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={onAudioEnded}
+            onWaiting={() => setBuffering(true)}
+            onPlaying={() => setBuffering(false)}
+            onCanPlay={() => { setBuffering(false); startIfWanted(); }}
+          />
           <p className="mt-3 font-mono text-xs tracking-[0.02em] text-laradama-dimmer">
             Try it — pick any photo, your match updates live in the demo →
           </p>
@@ -218,29 +579,16 @@ export default function Hero() {
         </div>
 
         {/* Right interactive demo */}
-        <div className="relative mx-auto w-full">
-          <div className="ld-frame-tabs">
-            {skinTabs.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setSkin(t.id)}
-                className={`ld-frame-tab ${skin === t.id ? "active" : ""}`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+        <div className="relative mx-auto w-full translate-y-2 xl:translate-y-4">
           <div className="ld-phone-stage">
             <div className="ld-floaty a" />
             <div className="ld-floaty b" />
-            <div ref={demoRef} className={`ld-device-frame ld-skin-${skin}`}>
-              <div className="ld-phone-notch" />
+            <div ref={demoRef} className="ld-device-frame">
               <div className="ld-browser-bar">
                 <span className="ld-bdot r" />
                 <span className="ld-bdot y" />
                 <span className="ld-bdot g" />
-                <span className="ld-browser-url">laradama.ai/match</span>
+                <span className="ld-browser-url">laradama.app/match</span>
               </div>
               <div className="ld-phone-screen">
                 <div className="ld-phone-topbar">
@@ -299,6 +647,11 @@ export default function Hero() {
                         <img src={uploadedImage || ""} style={uploadedImage ? undefined : { display: "none" }} alt="" />
                         <span>{uploadedImage ? "YOUR PHOTO" : song.tag.toUpperCase()}</span>
                       </div>
+                      {song.custom && (
+                        <span className="ld-pinpill" title="Pinned by a custom scan">
+                          Pinned · {song.custom.subject}
+                        </span>
+                      )}
                       <div className="ld-eq">
                         <span style={{ animationDelay: "0s" }} />
                         <span style={{ animationDelay: ".15s" }} />
@@ -306,19 +659,69 @@ export default function Hero() {
                         <span style={{ animationDelay: ".1s" }} />
                         <span style={{ animationDelay: ".25s" }} />
                       </div>
-                      <span className="ld-tagpill">{song.tag}</span>
+                      <span className="ld-tagpill">{analyzing ? "analyzing…" : song.tag}</span>
                     </div>
                     <div className="ld-info">
-                      <div className="ld-title">{song.title}</div>
-                      <div className="ld-artist">{song.artist}</div>
-                      <div className="ld-progress"><div /></div>
+                      <div className="ld-title">{analyzing ? "Matching your photo…" : song.title}</div>
+                      <div className="ld-artist">{analyzing ? "checking custom scans, then mood & color" : song.artist}</div>
+                      <div
+                        className="ld-progress"
+                        role="slider"
+                        aria-label="Seek within the track"
+                        aria-valuemin={0}
+                        aria-valuemax={Math.round(progress.duration) || 0}
+                        aria-valuenow={Math.round(progress.current) || 0}
+                        tabIndex={hasAudio ? 0 : -1}
+                        title={hasAudio ? "Click to seek" : "Upload a photo to play your match"}
+                        onClick={seekTo}
+                        onKeyDown={onProgressKeyDown}
+                      >
+                        <div style={{ width: progressPct }} />
+                      </div>
                       <div className="ld-time-row">
-                        <span>0:42</span>
-                        <span>2:58</span>
+                        <span>{hasAudio ? fmtTime(progress.current) || "0:00" : "0:42"}</span>
+                        <span>{hasAudio ? fmtTime(progress.duration) || "0:00" : "2:58"}</span>
+                      </div>
+                      <div className="ld-transport">
+                        <button
+                          className={`ld-tp-btn primary${buffering ? " buffering" : ""}`}
+                          type="button"
+                          onClick={toggleAudio}
+                          disabled={!hasAudio}
+                          aria-label={playing ? "Pause" : "Play"}
+                          title={playing ? "Pause" : "Play"}
+                        >
+                          {playing ? (
+                            <Pause size={15} strokeWidth={2.4} fill="currentColor" />
+                          ) : (
+                            <Play size={15} strokeWidth={2.4} fill="currentColor" />
+                          )}
+                        </button>
+                        <button
+                          className="ld-tp-btn"
+                          type="button"
+                          onClick={() => seekBy(10)}
+                          disabled={!hasAudio}
+                          aria-label="Fast forward 10 seconds"
+                          title="Fast forward 10s"
+                        >
+                          <FastForward size={14} strokeWidth={2.2} />
+                        </button>
+                        <button
+                          className={`ld-tp-btn${fetchingMore ? " buffering" : ""}`}
+                          type="button"
+                          onClick={nextTrack}
+                          disabled={analyzing || pool.length < 2}
+                          aria-label="Skip to the next track"
+                          title={fetchingMore ? "Loading more tracks…" : "Next track"}
+                        >
+                          <SkipForward size={14} strokeWidth={2.2} />
+                        </button>
+                        <span className="ld-tp-status">{statusLabel}</span>
                       </div>
                       <span className="ld-share-label">LISTEN & SHARE</span>
                       <div className="ld-action-row">
-                        <button className="ld-spotify-btn" id="spotifyBtn" type="button" aria-label="Listen on Spotify" onClick={() => window.open("https://open.spotify.com/search/" + encodeURIComponent(`${song.title} ${song.artist}`), "_blank")}>
+                        <button className="ld-spotify-btn" id="spotifyBtn" type="button" aria-label="Listen on Spotify" onClick={() => window.open(song.spotifyUrl || spotifySearchUrl(song.title, song.artist), "_blank")}>
                           <SpotifyIcon /> Listen on Spotify
                         </button>
                         <button className="ld-icon-btn ig" id="igBtn" type="button" aria-label="Add to Instagram Story" title="Add to Instagram Story" onClick={() => openStoryModal("Instagram")}>
@@ -333,7 +736,7 @@ export default function Hero() {
                       </button>
                       <div className={`ld-why-panel${whyOpen ? " open" : ""}`} id="ldWhyPanel">
                         <span className="ld-why-label">✦ AI EXPLANATION</span>
-                        <span dangerouslySetInnerHTML={{ __html: song.why }} />
+                        <span dangerouslySetInnerHTML={{ __html: analyzing ? "Checking it against custom scans, then reading your photo&rsquo;s colors, mood, and motion&hellip;" : song.why }} />
                       </div>
                     </div>
                   </div>
@@ -380,7 +783,11 @@ export default function Hero() {
               <div
                 key={t.id}
                 className={`ld-thumb-wrap${currentTemplate === t.id ? " selected" : ""}`}
-                onClick={() => setCurrentTemplate(t.id)}
+                onClick={() => {
+                  setCurrentTemplate(t.id);
+                  // the previous "Saved …" line belongs to the old template
+                  setShare({ phase: "idle", message: "" });
+                }}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCurrentTemplate(t.id); }}
@@ -395,8 +802,16 @@ export default function Hero() {
           </div>
           <div className="ld-modal-actions">
             <button className="ld-btn-ghost" id="modalCancel" onClick={closeStoryModal}>Cancel</button>
-            <button className="ld-btn-primary" id="modalShare" onClick={handleShare}>Post to Story</button>
+            <button className="ld-btn-ghost" id="modalDownload" onClick={handleDownload} disabled={shareBusy}>
+              Download
+            </button>
+            <button className="ld-btn-primary" id="modalShare" onClick={handleShare} disabled={shareBusy}>
+              {shareBusy ? "Rendering…" : shareSupported ? "Post to Story" : `Save & open ${currentPlatform}`}
+            </button>
           </div>
+          <p className={`ld-share-status${shareTone}`} role="status" aria-live="polite">
+            {share.message || (preparing ? "Getting your Story image ready…" : "")}
+          </p>
         </div>
       </div>
   </>

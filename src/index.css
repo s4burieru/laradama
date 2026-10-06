@@ -42,50 +42,21 @@
 /* ============================================================
    HERO DEVICE DEMO — Laradama
    ============================================================ */
-.ld-frame-tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 20px; }
-.ld-frame-tab {
-  background: var(--color-laradama-card);
-  border: 1px solid var(--color-laradama-line);
-  color: var(--color-laradama-dim);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 8px 16px;
-  border-radius: 0;
-  cursor: pointer;
-  letter-spacing: 0.02em;
-  transition: all 0.15s;
-}
-.ld-frame-tab:hover { border-color: var(--color-laradama-dimmer); color: var(--color-laradama-ink); }
-.ld-frame-tab.active { background: var(--color-laradama-brand); color: #06170c; border-color: var(--color-laradama-brand); }
-
 .ld-phone-stage { position: relative; display: flex; justify-content: center; }
 
 .ld-floaty { position: absolute; filter: blur(60px); opacity: 0.35; pointer-events: none; z-index: 0; }
 .ld-floaty.a { width: 340px; height: 340px; background: var(--color-laradama-brand); top: -80px; right: -120px; }
 .ld-floaty.b { width: 280px; height: 280px; background: var(--color-laradama-dim); bottom: -60px; left: -100px; opacity: 0.18; }
 
-.ld-device-frame { position: relative; overflow: hidden; transition: width 0.3s, height 0.3s, border-radius 0.3s, box-shadow 0.3s, transform 0.3s; z-index: 1; }
-.ld-device-frame .ld-browser-bar { display: none; }
-.ld-device-frame .ld-phone-notch { display: none; }
-
-.ld-device-frame.ld-skin-phone { width: 320px; height: 640px; background: var(--color-laradama-elevated); border: 10px solid #050506; }
-.ld-device-frame.ld-skin-phone .ld-phone-notch { display: block; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 22px; background: #050506; z-index: 20; }
-.ld-device-frame.ld-skin-phone .ld-phone-screen { padding: 38px 16px 20px; }
-.ld-device-frame.ld-skin-browser { width: 400px; height: 600px; background: var(--color-laradama-elevated); border: 1px solid var(--color-laradama-line); }
-.ld-device-frame.ld-skin-browser .ld-browser-bar { display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border-bottom: 1px solid var(--color-laradama-line); flex-shrink: 0; }
-.ld-device-frame.ld-skin-browser .ld-bdot { width: 9px; height: 9px; border-radius: 0; }
+.ld-device-frame { --ld-bar-h: 40px; position: relative; overflow: hidden; transition: width 0.3s, height 0.3s, border-radius 0.3s, box-shadow 0.3s, transform 0.3s; z-index: 1; width: 100%; height: 640px; background: var(--color-laradama-elevated); border: 1px solid var(--color-laradama-line); container-type: inline-size; }
+@media (min-width: 768px) { .ld-device-frame { height: 720px; } }
+.ld-device-frame .ld-browser-bar { display: flex; align-items: center; gap: 7px; height: var(--ld-bar-h); padding: 0 14px; border-bottom: 1px solid var(--color-laradama-line); flex-shrink: 0; }
+.ld-device-frame .ld-bdot { width: 9px; height: 9px; border-radius: 0; }
 .ld-bdot.r { background: #ff5f56; }
 .ld-bdot.y { background: #ffbd2e; }
 .ld-bdot.g { background: #27c93f; }
-.ld-device-frame.ld-skin-browser .ld-browser-url { margin-left: 8px; font-family: var(--font-mono); font-size: 10.5px; color: var(--color-laradama-dimmer); background: var(--color-laradama-surface); padding: 4px 12px; flex: 1; text-align: center; }
-.ld-device-frame.ld-skin-browser .ld-phone-screen { padding: 18px 20px; height: calc(100% - 38px); }
-
-.ld-device-frame.ld-skin-float { width: 300px; height: 600px; background: transparent; border: none; box-shadow: none; filter: drop-shadow(0 30px 45px rgba(0, 0, 0, 0.55)); transform: rotate(-1.4deg); overflow: visible; }
-.ld-device-frame.ld-skin-float .ld-phone-screen { padding: 0; }
-.ld-device-frame.ld-skin-float .ld-phone-topbar { padding: 0 2px 14px; }
-.ld-device-frame.ld-skin-float .ld-song-card,
-.ld-device-frame.ld-skin-float .ld-phone-upload-cta { box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.6); }
+.ld-device-frame .ld-browser-url { margin-left: 8px; font-family: var(--font-mono); font-size: 10.5px; color: var(--color-laradama-dimmer); background: var(--color-laradama-surface); padding: 4px 12px; flex: 1; text-align: center; }
+.ld-device-frame .ld-phone-screen { padding: 18px 22px; height: calc(100% - var(--ld-bar-h)); }
 
 .ld-phone-screen { height: 100%; display: flex; flex-direction: column; position: relative; }
 .ld-phone-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding: 0 4px; }
@@ -114,6 +85,7 @@
 .ld-song-card .ld-art .ld-eq span { width: 4px; background: rgba(255, 255, 255, 0.7); animation: eq 1.1s ease-in-out infinite; }
 @keyframes eq { 0%, 100% { height: 14px; } 50% { height: 44px; } }
 .ld-song-card .ld-art .ld-tagpill { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(6px); padding: 5px 10px; font-size: 10.5px; font-family: var(--font-mono); position: relative; z-index: 2; }
+.ld-song-card .ld-art .ld-pinpill { position: absolute; top: 12px; right: 12px; z-index: 2; background: var(--color-laradama-brand); color: #06170C; padding: 5px 9px; font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; backdrop-filter: blur(6px); }
 .ld-song-card .ld-art .ld-photo-badge { position: absolute; top: 12px; left: 12px; z-index: 2; display: flex; align-items: center; gap: 6px; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(6px); padding: 4px 10px 4px 4px; }
 .ld-song-card .ld-art .ld-photo-badge img { width: 20px; height: 20px; object-fit: cover; }
 .ld-song-card .ld-art .ld-photo-badge span { font-family: var(--font-mono); font-size: 9.5px; color: #fff; }
@@ -121,9 +93,18 @@
 .ld-song-card .ld-info { padding: 16px 18px 18px; flex: 1; display: flex; flex-direction: column; }
 .ld-song-card .ld-title { font-family: var(--font-display); font-weight: 700; font-size: 19px; margin-bottom: 3px; }
 .ld-song-card .ld-artist { font-size: 13px; color: var(--color-laradama-dim); margin-bottom: 14px; }
-.ld-progress { height: 3px; background: var(--color-laradama-line); margin-bottom: 6px; overflow: hidden; }
+.ld-progress { height: 3px; background: var(--color-laradama-line); margin-bottom: 6px; overflow: hidden; cursor: pointer; }
 .ld-progress > div { height: 100%; width: 34%; background: var(--color-laradama-brand); }
-.ld-time-row { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--color-laradama-dimmer); font-family: var(--font-mono); margin-bottom: 16px; }
+.ld-time-row { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--color-laradama-dimmer); font-family: var(--font-mono); margin-bottom: 8px; }
+.ld-transport { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.ld-tp-btn { width: 34px; height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--color-laradama-surface); border: 1px solid var(--color-laradama-line); color: var(--color-laradama-ink); cursor: pointer; transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.12s; }
+.ld-tp-btn:hover:not(:disabled) { border-color: var(--color-laradama-brand); color: var(--color-laradama-brand); transform: translateY(-1px); }
+.ld-tp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.ld-tp-btn.primary { width: 40px; height: 40px; background: var(--color-laradama-brand); border-color: var(--color-laradama-brand); color: #06170c; }
+.ld-tp-btn.primary:hover:not(:disabled) { background: var(--color-laradama-brand-hover); border-color: var(--color-laradama-brand-hover); color: #06170c; }
+.ld-tp-btn.buffering { animation: ld-blink 0.9s ease-in-out infinite; }
+@keyframes ld-blink { 50% { opacity: 0.45; } }
+.ld-tp-status { margin-left: auto; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-laradama-dimmer); }
 .ld-share-label { font-size: 9.5px; color: var(--color-laradama-dimmer); font-family: var(--font-mono); display: block; margin-bottom: 7px; }
 .ld-action-row { display: flex; gap: 8px; margin-bottom: 12px; }
 .ld-spotify-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; height: 40px; background: #000; border: 1px solid var(--color-laradama-brand); color: var(--color-laradama-ink); font-size: 12px; font-weight: 700; cursor: pointer; transition: background 0.15s, transform 0.12s; }
@@ -156,6 +137,51 @@
 .ld-swipe-btn.keep { width: 60px; height: 60px; background: var(--color-laradama-brand); border-color: var(--color-laradama-brand); }
 .ld-swipe-btn.keep:hover { background: var(--color-laradama-brand-hover); }
 .ld-swipe-btn svg { width: 20px; height: 20px; }
+
+/* ---------- RESPONSIVE INSIDE THE BROWSER FRAME ----------
+   The frame is a CSS container, so the mock site reflows to the
+   browser's own width (not the viewport). */
+@container (min-width: 500px) {
+  .ld-device-frame .ld-phone-screen { padding: 20px 26px; }
+  .ld-phone-topbar { margin-bottom: 18px; }
+  .ld-phone-topbar .ld-tlabel { font-size: 11.5px; }
+  /* Wide browser: artwork on the left, player details on the right */
+  .ld-song-card { flex-direction: row; }
+  .ld-song-card .ld-art { width: 45%; height: auto; flex-shrink: 0; }
+  .ld-song-card .ld-info { padding: 20px 22px 22px; min-height: 0; overflow-y: auto; }
+  .ld-song-card .ld-title { font-size: 21px; }
+  .ld-song-card .ld-artist { font-size: 13.5px; margin-bottom: 16px; }
+  .ld-spotify-btn { font-size: 12.5px; }
+  .ld-phone-upload-cta { padding: 40px; gap: 16px; }
+  .ld-phone-upload-cta h4 { font-size: 17px; }
+  .ld-phone-upload-cta p { font-size: 13px; max-width: 360px; }
+}
+
+@container (min-width: 700px) {
+  .ld-device-frame .ld-phone-screen { padding: 22px 30px; }
+  .ld-song-card .ld-art { width: 48%; }
+  .ld-song-card .ld-info { padding: 24px 28px 26px; }
+  .ld-song-card .ld-title { font-size: 23px; }
+  .ld-song-card .ld-artist { font-size: 14px; }
+}
+
+@container (max-width: 440px) {
+  .ld-device-frame .ld-phone-screen { padding: 14px 14px 16px; }
+  .ld-phone-topbar { margin-bottom: 12px; }
+  .ld-phone-topbar .ld-tlabel { font-size: 10px; }
+  .ld-song-card .ld-art { padding: 10px; }
+  .ld-song-card .ld-info { padding: 14px 14px 16px; min-height: 0; overflow-y: auto; }
+  .ld-song-card .ld-title { font-size: 17px; }
+  .ld-song-card .ld-artist { font-size: 12.5px; margin-bottom: 10px; }
+  .ld-transport { gap: 6px; margin-bottom: 12px; }
+  .ld-action-row { margin-bottom: 10px; }
+  .ld-why-toggle { padding: 8px 10px; font-size: 11.5px; }
+  .ld-why-panel { padding: 10px; font-size: 12px; }
+  .ld-spotify-btn { font-size: 11.5px; height: 38px; }
+  .ld-icon-btn, .ld-tp-btn.primary { width: 38px; height: 38px; }
+  .ld-phone-upload-cta { padding: 18px; gap: 12px; }
+  .ld-phone-upload-cta p { max-width: 200px; font-size: 11.5px; }
+}
 /* ---------- STORY TEMPLATE MODAL ---------- */
 .ld-modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
 .ld-modal-overlay.open { display: flex; }
@@ -202,12 +228,15 @@
 .ld-thumb-wrap .ld-story-card { border: 2px solid transparent; transition: border-color 0.15s; }
 .ld-thumb-wrap.selected .ld-story-card { border-color: var(--color-laradama-brand); box-shadow: 0 0 0 2px rgba(30, 215, 96, 0.2); }
 .ld-thumb-label { font-size: 9.5px; color: var(--color-laradama-dim); font-family: var(--font-mono); }
-.ld-modal-actions { display: flex; gap: 10px; margin-top: 24px; }
-.ld-modal-actions button { flex: 1; justify-content: center; }
+.ld-modal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.ld-modal-actions button { min-width: max-content; justify-content: center; font-size: 12.5px; padding: 11px 12px; }
+.ld-modal-actions button:disabled { opacity: 0.65; cursor: progress; }
+.ld-share-status { margin-top: 14px; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; color: var(--color-laradama-dim); }
+.ld-share-status:empty { display: none; }
+.ld-share-status.ok { color: var(--color-laradama-brand); }
+.ld-share-status.bad { color: var(--color-laradama-coral); }
 
-@media (max-width: 980px) {
-  .ld-device-frame { max-width: 100%; }
-}
+/* Frame width is fluid via width: min(100%, 620px) — no breakpoint needed. */
 .ld-btn-primary,
 .ld-btn-ghost {
   display: inline-flex;
