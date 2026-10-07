@@ -9,6 +9,7 @@ import TeamPage from "./pages/TeamPage";
 import ContactPage from "./pages/ContactPage";
 import AboutPage from "./pages/AboutPage";
 import FeaturesPage from "./pages/FeaturesPage";
+import LegalPage from "./pages/LegalPage";
 
 export default function App() {
   const path = window.location.pathname;
@@ -22,6 +23,10 @@ export default function App() {
     page = <AboutPage />;
   } else if (path === "/features") {
     page = <FeaturesPage />;
+  } else if (path === "/privacy") {
+    page = <LegalPage type="privacy" />;
+  } else if (path === "/terms") {
+    page = <LegalPage type="terms" />;
   } else {
     page = (
       <div className="min-h-screen bg-black font-sans text-white">
