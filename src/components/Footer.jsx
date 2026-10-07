@@ -3,7 +3,7 @@ import { Mail, MapPin, Phone } from "lucide-react";
 const nav = [
   { label: "About", href: "/about" },
   { label: "Features", href: "/features" },
-  { label: "How to Use", href: "/#how-it-works" },
+  { label: "How to Use", href: "/how-to-use" },
   { label: "Team", href: "/team" },
 ];
 

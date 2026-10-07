@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 const links = [
   { label: "About Laradama", href: "/about" },
-  { label: "How to Use", href: "#how-it-works" },
+  { label: "How to Use", href: "/how-to-use" },
   { label: "Features", href: "/features" },
 ];
 
