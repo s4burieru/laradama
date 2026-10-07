@@ -3,7 +3,7 @@ import { Mail, MapPin, Phone } from "lucide-react";
 const nav = [
   { label: "About", href: "/about" },
   { label: "Features", href: "/features" },
-  { label: "How to Use", href: "/#how-it-works" },
+  { label: "How to Use", href: "/how-to-use" },
   { label: "Team", href: "/team" },
 ];
 
@@ -86,9 +86,9 @@ export default function Footer() {
             <div className="flex items-center gap-2.5 max-[1100px]:pl-0">
               <p className="m-0 text-[12px]">© 2026 laradama.app</p>
               <span className="text-[#808080]" aria-hidden="true">•</span>
-              <a className="m-0 border-0 bg-transparent p-0 text-inherit no-underline" href="#">Privacy</a>
+              <a className="m-0 border-0 bg-transparent p-0 text-inherit no-underline transition-colors hover:text-white" href="/privacy">Privacy</a>
               <span className="text-[#808080]" aria-hidden="true">•</span>
-              <a className="m-0 border-0 bg-transparent p-0 text-inherit no-underline" href="#">Terms</a>
+              <a className="m-0 border-0 bg-transparent p-0 text-inherit no-underline transition-colors hover:text-white" href="/terms">Terms</a>
             </div>
             <div className="flex justify-end gap-2.5 pr-2.5 max-[1100px]:justify-start max-[1100px]:pr-0">
               {socials.map((s) => (
