@@ -7,10 +7,14 @@
  * popularity weighted hard: artist-name searches surface well-known acts
  * (international + OPM, see data/popularArtists.js), their credits take a big
  * score boost, and the deck saves slots for them — popularity decides who is
- * in the running, the photo decides who fits.
+ * in the running, the photo decides who fits. Photos whose vibe can carry it
+ * (see data/brainrotTracks.js) also get the curated brainrot pool searched by
+ * title and a guaranteed slot in the deck.
  */
 
 import { isPopularArtist, popularArtistsFor } from '../data/popularArtists.js';
+import { brainrotEligible, brainrotFor } from '../data/brainrotTracks.js';
+import { f1Eligible, f1For } from '../data/f1Tracks.js';
 
 const APP_NAME = 'laradama';
 
@@ -23,6 +27,12 @@ const GENRE_AFFINITIES = {
 
 /** How much a curated popular artist (intl + OPM) outranks an obscure mood hit. */
 const POPULAR_ARTIST_BOOST = 10;
+
+/** How much a curated brainrot cut (data/brainrotTracks.js) outranks an obscure mood hit — a fun slot winner, never a known act's. */
+const BRAINROT_BOOST = 4;
+
+/** How much a curated F1 hit (data/f1Tracks.js) outranks an obscure mood hit — F1 music outranks when the photo is F1. */
+const F1_BOOST = 8;
 
 /** Audius play counts: 1M plays ≈ +4, 10k ≈ +2.8, 100 ≈ +1.4. */
 const popularityBoost = (t) => (t.popularity > 0 ? Math.min(4, Math.log10(t.popularity + 1) * 0.7) : 0);
@@ -228,6 +238,8 @@ function rankCandidates(analysis, tracks, exclude = new Set()) {
     if (t.source === 'audius') score += 1.5; // full stream beats a 30s preview
     score += popularityBoost(t); // real play counts
     if (isPopularArtist(t.artist)) score += POPULAR_ARTIST_BOOST; // known act over a deep cut
+    if (t.brainrot) score += BRAINROT_BOOST; // curated meme pick over an obscure mood hit
+    if (t.f1) score += F1_BOOST; // F1-flavoured pick over an obscure mood hit
     scored.push({ ...t, score });
   }
   scored.sort((a, b) => b.score - a.score);
@@ -246,9 +258,12 @@ const rotate = (arr, n) => {
  * fewer than `minPopular` popular-artist tracks when the search found any, and
  * never more than `maxPerArtist` songs by the same act — a deck of six tracks
  * by two artists is not a deck of matches. Promotion works from the tail, so
- * the top of the deck keeps its mood-fit order.
+ * the top of the deck keeps its mood-fit order. `minBrainrot` reserves slots
+ * for the curated meme pool the same way — it is only ever passed for photos
+ * whose vibe was eligible for that pool (0 otherwise), so calm photos build
+ * exactly the deck they built before brainrot existed.
  */
-function deckFor(ranked, { size = 6, minPopular = 3, maxPerArtist = 2 } = {}) {
+function deckFor(ranked, { size = 6, minPopular = 3, maxPerArtist = 2, minBrainrot = 0, maxBrainrot = 2, minF1 = 0, maxF1 = 2 } = {}) {
   const inDeck = new Set();
   const perArtist = new Map();
   const deck = [];
@@ -264,19 +279,52 @@ function deckFor(ranked, { size = 6, minPopular = 3, maxPerArtist = 2 } = {}) {
   };
   const isPopular = (t) => isPopularArtist(t.artist);
   const popularCount = () => deck.reduce((n, t) => n + (isPopular(t) ? 1 : 0), 0);
+  const isBrainrot = (t) => Boolean(t.brainrot);
+  const brainrotCount = () => deck.reduce((n, t) => n + (isBrainrot(t) ? 1 : 0), 0);
+  const isF1 = (t) => Boolean(t.f1);
+  const f1Count = () => deck.reduce((n, t) => n + (isF1(t) ? 1 : 0), 0);
 
   for (const t of ranked) {
     if (deck.length >= size) break;
     if ((perArtist.get(t.artist) || 0) >= maxPerArtist) continue;
+    if (isBrainrot(t) && brainrotCount() >= maxBrainrot) continue; // fun slots, not an EP
+    if (isF1(t) && f1Count() >= maxF1) continue; // capped so the deck still has range
     add(t);
   }
 
-  // Popular acts are the priority: trade the deck's weakest slots for them
-  // until the quota holds (or the pool runs out of popular candidates).
+  // Popular acts are the priority: trade the deck's weakest mood-fit slots for
+  // them until the quota holds (or the pool runs out of popular candidates).
+  // Brainrot/F1 slots are skipped — the fun quota must not eat the known-act quota.
   while (popularCount() < minPopular) {
-    const slot = [...deck].reverse().find((t) => !isPopular(t));
+    const slot = [...deck].reverse().find((t) => !isPopular(t) && !isBrainrot(t) && !isF1(t));
     const promo = ranked.find(
       (t) => !inDeck.has(t) && isPopular(t) && (perArtist.get(t.artist) || 0) < maxPerArtist,
+    );
+    if (!slot || !promo) break;
+    drop(slot);
+    add(promo);
+  }
+
+  // Brainrot quota: promote from the tail into the weakest mood-fit slot —
+  // never a popular one, so this cannot walk back the quota above.
+  while (brainrotCount() < minBrainrot) {
+    const slot = [...deck].reverse().find((t) => !isBrainrot(t) && !isPopular(t) && !isF1(t));
+    const promo = ranked.find(
+      (t) => !inDeck.has(t) && isBrainrot(t) && (perArtist.get(t.artist) || 0) < maxPerArtist,
+    );
+    if (!slot || !promo) break;
+    drop(slot);
+    add(promo);
+  }
+
+  // F1 quota: promote from the tail into the weakest mood-fit slot — never a
+  // popular slot below the popular floor, and never a protected brainrot slot.
+  while (f1Count() < minF1) {
+    const slot = [...deck].reverse().find(
+      (t) => !isF1(t) && !isBrainrot(t) && (!isPopular(t) || popularCount() > minPopular),
+    );
+    const promo = ranked.find(
+      (t) => !inDeck.has(t) && isF1(t) && (perArtist.get(t.artist) || 0) < maxPerArtist,
     );
     if (!slot || !promo) break;
     drop(slot);
@@ -304,9 +352,10 @@ function deckFor(ranked, { size = 6, minPopular = 3, maxPerArtist = 2 } = {}) {
  * already shown — so each press of Next returns songs that have not been played
  * yet. Both sources are hit in parallel; iTunes is also searched by artist name
  * (international + OPM) so the deck is stocked with popular music, not only
- * deep mood-fit cuts.
+ * deep mood-fit cuts — and when the photo's vibe is eligible for it, the
+ * curated brainrot pool is searched by title and gets a reserved deck slot.
  */
-export async function findTracks(analysis, { exclude = [], batch = 0 } = {}) {
+export async function findTracks(analysis, { exclude = [], batch = 0, playlist } = {}) {
   const seen = new Set(exclude.map((k) => String(k || '').toLowerCase()));
   const later = batch > 0;
 
@@ -355,17 +404,98 @@ export async function findTracks(analysis, { exclude = [], batch = 0 } = {}) {
     attribute: 'artistTerm',
   }));
 
+  // Curated pools: brainrot only fires for photos whose vibe can carry it
+  // (brainrotEligible — energetic-and-not-gloomy, or playful keywords
+  // with a happy valence); F1 wins when it matches, since it is the more
+  // specific fence. A non-F1 photo falls back to brainrot exactly as before.
+  // Any pinned custom scan can override the mood answer through `playlist`:
+  // if the entry has one, the whole deck runs on that pool no matter what
+  // the untagged track searches would have chosen.
+  const f1Now = playlist ? playlist === 'f1' : f1Eligible(analysis);
+  const brainrotNow = playlist
+    ? playlist === 'brainrot'
+    : !f1Now && brainrotEligible(analysis);
+  const f1Picks = (f1Now ? f1For(analysis, { batch, limit: 4 }) : []).filter(
+    (p) => !seen.has(`${p.title.toLowerCase()}::${p.artist.toLowerCase()}`),
+  );
+  const brainrotPicks = (
+    brainrotNow ? brainrotFor(analysis, { batch, limit: playlist === 'brainrot' ? 4 : 2 }) : []
+  ).filter(
+    (p) => !seen.has(`${p.title.toLowerCase()}::${p.artist.toLowerCase()}`),
+  );
+
   // Later batches scan deeper (more results per query) so excluding the tracks
   // already on screen still leaves plenty of unseen candidates behind.
   const depth = later ? { max: 30, perQuery: 25 } : { max: 12, perQuery: 10 };
 
-  const [audius, moodHits, artistHits] = await Promise.all([
+  const [audius, moodHits, artistHits, brainrotHits, f1Hits] = await Promise.all([
     searchAudius(audiusQueries, { max: depth.max }),
     searchItunes(phraseQueries, depth),
     searchItunes(artistQueries, { max: artistQueries.length * 6, perQuery: 6 }),
+    searchBrainrot(brainrotPicks),
+    searchF1(f1Picks),
   ]);
 
-  return deckFor(rankCandidates(analysis, [...audius, ...moodHits, ...artistHits], seen));
+  // The pinned pool hits go in first, then mood/popular rows — either way the
+  // dedupe in rankCandidates keeps the tagged copies. The pool sets the deck
+  // 's floor: when a scan pinned a pool, at least 4 of 6 slots come from that
+  // pool, the popular floor drops to 1, and the other cheap pool is suppressed
+  // entirely (brainrot vs F1 never fight over the same deck).
+  return deckFor(
+    rankCandidates(analysis, [...f1Hits, ...brainrotHits, ...audius, ...moodHits, ...artistHits], seen),
+    {
+      minPopular: playlist === 'brainrot' || (!playlist && f1Picks.length) ? 1 : 3,
+      minBrainrot: playlist === 'brainrot' ? 4 : brainrotPicks.length ? 1 : 0,
+      maxBrainrot: playlist === 'brainrot' ? 6 : 2,
+      minF1: playlist === 'f1' || (!playlist && f1Picks.length) ? 4 : 0,
+      maxF1: playlist === 'f1' || (!playlist && f1Picks.length) ? 6 : 2,
+    },
+  );
+}
+
+/**
+ * Searches iTunes for the picked F1-pool entries and tags hits `f1: <flavor>`,
+ * with the same title/artist gate searchBrainrot uses.
+ */
+async function searchF1(picks) {
+  if (!picks.length) return [];
+  const rows = await searchItunes(
+    picks.map((p) => `${p.title} ${p.artist}`),
+    { max: picks.length * 6, perQuery: 6 },
+  );
+  const out = [];
+  for (const t of rows) {
+    if (!t.title || !t.audioUrl) continue;
+    const pick = picks.find(
+      (p) => tokenScore(t.title, p.title) >= 0.8 && tokenScore(t.artist, p.artist) >= 0.5,
+    );
+    if (pick) out.push({ ...t, f1: pick.flavor });
+  }
+  return out;
+}
+
+/**
+ * Searches iTunes for the picked meme-pool entries and gates every row back
+ * to the entry that asked for it — title ≥ 0.8 AND artist ≥ 0.5 token overlap,
+ * the same bars as findTrackForTitle — so a same-named song by an unrelated
+ * act is never played. Tagged rows carry `brainrot: <flavor>` for ranking,
+ * the deck quota and the card pill.
+ */
+async function searchBrainrot(picks) {
+  if (!picks.length) return [];
+  const rows = await searchItunes(
+    picks.map((p) => `${p.title} ${p.artist}`),
+    { max: picks.length * 6, perQuery: 6 },
+  );
+  const out = [];
+  for (const t of rows) {
+    if (!t.title || !t.audioUrl) continue;
+    const pick = picks.find(
+      (p) => tokenScore(t.title, p.title) >= 0.8 && tokenScore(t.artist, p.artist) >= 0.5,
+    );
+    if (pick) out.push({ ...t, brainrot: pick.flavor });
+  }
+  return out;
 }
 
 function tokens(s) {
@@ -391,10 +521,13 @@ export async function findTrackForTitle(title, artist) {
   if (!target) return null;
   const who = String(artist || '').trim();
 
-  const candidates = [
-    ...(await searchAudius([target])),
-    ...(await searchItunes(who ? [`${target} ${who}`, target] : [target])),
-  ];
+  // Both sources at once: this lookup sits on the critical path to the deck,
+  // so Audius' host discovery must not gate the iTunes search behind it.
+  const [audiusHits, iTunesHits] = await Promise.all([
+    searchAudius([target]),
+    searchItunes(who ? [`${target} ${who}`, target] : [target]),
+  ]);
+  const candidates = [...audiusHits, ...iTunesHits];
 
   const seen = new Set();
   const scored = [];

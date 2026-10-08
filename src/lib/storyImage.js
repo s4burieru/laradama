@@ -93,6 +93,21 @@ function loadImage(src) {
   });
 }
 
+/** The mascot mark, loaded once per page and reused by every export. */
+const LOGO_SRC = '/laradama-logo.png';
+let logoCache = null;
+function loadLogo() {
+  if (!logoCache) {
+    logoCache = loadImage(LOGO_SRC).catch((err) => {
+      // Never fail the export over branding: the watermark falls back to the
+      // gradient dot the CSS used before the logo existed.
+      console.warn('[story] logo failed to load, using the gradient mark:', err);
+      return null;
+    });
+  }
+  return logoCache;
+}
+
 /**
  * Make sure the weights the templates use are actually resident before
  * drawing — but never let it stall the export: a blocked/slow font CDN would
@@ -187,9 +202,12 @@ function drawText(ctx, text, opts) {
   ctx.restore();
 }
 
-/** `.ld-story-wm` — gradient dot + label, flush to a corner. */
-function drawWatermark(ctx, { edge, y, align, label, s }) {
-  const dot = 11 * s;
+/**
+ * `.ld-story-wm` — the Laradama logo + label, flush to a corner. The gradient
+ * square only shows if the logo image could not be decoded.
+ */
+function drawWatermark(ctx, { edge, y, align, label, s, logo = null }) {
+  const mark = 20 * s; // .ld-story-logo box
   const gap = 4 * s;
   const size = 9 * s;
   ctx.save();
@@ -197,14 +215,18 @@ function drawWatermark(ctx, { edge, y, align, label, s }) {
   const textW = ctx.measureText(label).width;
   ctx.restore();
   const right = align === 'right';
-  const textX = right ? edge : edge + dot + gap;
-  const dotX = right ? edge - textW - gap - dot : edge;
-  const grad = cssLinearGradient(ctx, `linear-gradient(135deg,${BRAND},${BRAND_DEEP})`, dotX, y, dot, dot);
-  ctx.fillStyle = grad || BRAND;
-  ctx.fillRect(dotX, y, dot, dot);
+  const textX = right ? edge : edge + mark + gap;
+  const markX = right ? edge - textW - gap - mark : edge;
+  if (logo) {
+    drawContain(ctx, logo, markX, y, mark, mark);
+  } else {
+    const grad = cssLinearGradient(ctx, `linear-gradient(135deg,${BRAND},${BRAND_DEEP})`, markX, y, mark, mark);
+    ctx.fillStyle = grad || BRAND;
+    ctx.fillRect(markX, y, mark, mark);
+  }
   drawText(ctx, label, {
     x: textX,
-    y: y + dot / 2,
+    y: y + mark / 2,
     baseline: 'middle',
     size,
     weight: 700,
@@ -259,7 +281,7 @@ function paintBackdrop(ctx, w, h, s, song, photo, mode) {
 
 /* --------------------------------------------------------------- templates */
 
-function paintClean(ctx, w, h, s, song, photo) {
+function paintClean(ctx, w, h, s, song, photo, logo) {
   paintBackdrop(ctx, w, h, s, song, photo, 'cover');
 
   // .ld-story-scrim-b
@@ -270,7 +292,7 @@ function paintClean(ctx, w, h, s, song, photo) {
   ctx.fillStyle = scrim;
   ctx.fillRect(0, 0, w, h);
 
-  drawWatermark(ctx, { edge: 8 * s, y: 8 * s, align: 'left', label: 'Laradama', s });
+  drawWatermark(ctx, { edge: 8 * s, y: 8 * s, align: 'left', label: 'laradama', s, logo });
 
   const pad = 10 * s;
   const maxW = w - pad * 2;
@@ -310,27 +332,28 @@ function paintClean(ctx, w, h, s, song, photo) {
   });
 }
 
-function paintMeme(ctx, w, h, s, song, photo) {
+function paintMeme(ctx, w, h, s, song, photo, logo) {
   paintBackdrop(ctx, w, h, s, song, photo, 'contain');
 
   const size = 7.8 * s;
-  const lh = size * 1.25; // .ld-meme-bar line-height
   const padY = 5 * s;
   const padX = 6 * s;
   const innerW = w - padX * 2;
-  // The bars grow with their text in the preview, so wrap first and size the
-  // bar afterwards — capped so a runaway title cannot swallow the frame.
-  const maxLines = Math.max(1, Math.floor((0.4 * h) / lh));
-  const linesOf = (text) => {
+  const linesOf = (text, fontSize) => {
     const upper = String(text ?? '').toUpperCase();
     ctx.save();
-    ctx.font = `700 ${size}px ${FONT_STACK}`;
+    ctx.font = `700 ${fontSize}px ${FONT_STACK}`;
+    const lh = fontSize * 1.25; // .ld-meme-bar line-height
+    // The bars grow with their text in the preview, so wrap first and size the
+    // bar afterwards — capped so a runaway title cannot swallow the frame.
+    const maxLines = Math.max(1, Math.floor((0.4 * h) / lh));
     const lines = wrapText(ctx, upper, innerW, maxLines);
     ctx.restore();
     return lines;
   };
-  const bar = (text, top) => {
-    const lines = linesOf(text);
+  const bar = (text, top, fontSize = size) => {
+    const lh = fontSize * 1.25; // .ld-meme-bar line-height
+    const lines = linesOf(text, fontSize);
     const barH = padY * 2 + lines.length * lh;
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, top, w, barH);
@@ -340,7 +363,7 @@ function paintMeme(ctx, w, h, s, song, photo) {
         y: top + padY + lh * (i + 0.5),
         baseline: 'middle',
         align: 'center',
-        size,
+        size: fontSize,
         weight: 700,
         color: '#000',
         maxWidth: innerW,
@@ -348,64 +371,91 @@ function paintMeme(ctx, w, h, s, song, photo) {
     });
   };
 
-  bar("my photo's soundtrack is", 0);
-  const bottomLines = linesOf(song.title);
-  bar(song.title, h - (padY * 2 + bottomLines.length * lh));
+  // The caption is centred, so at the bottom bar's size it would start around
+  // x=17 and touch the logo sitting at x=4..17 — a hair smaller buys ~6px of
+  // clearance. Mirrored by `.ld-meme-bar.top { font-size }`.
+  bar("my photo's soundtrack is", 0, 7 * s);
+
+  // .ld-meme-bar .ld-story-logo — tucked into the top bar's left corner, on
+  // top of the white fill. Capped at 13 design px like the CSS: any bigger and
+  // the centred caption would run into it.
+  if (logo) drawContain(ctx, logo, 4 * s, 3 * s, 13 * s, 13 * s);
+
+  const bottomLines = linesOf(song.title, size);
+  bar(song.title, h - (padY * 2 + bottomLines.length * (size * 1.25)));
 }
 
-function paintVinyl(ctx, w, h, s, song, photo) {
+function paintVinyl(ctx, w, h, s, song, photo, logo) {
   paintBackdrop(ctx, w, h, s, song, photo, 'blur');
 
-  // .ld-vinyl-disc — a square sleeve (the CSS carries no border-radius),
-  // centred at 50% / 38% and 62% of the card wide.
+  // .ld-vinyl-disc — a circular record (border-radius: 50%), centred at 50% /
+  // 38% and 62% of the card wide. Every layer beneath is round too.
   const disc = 0.62 * w;
-  const dx = (w - disc) / 2;
-  const dy = 0.38 * h - disc / 2;
+  const r = disc / 2;
+  const cx = w / 2;
+  const cy = 0.38 * h;
 
   ctx.save();
   ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
   ctx.shadowBlur = 24 * s;
   ctx.shadowOffsetY = 8 * s;
   ctx.fillStyle = '#111';
-  ctx.fillRect(dx, dy, disc, disc);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 
-  // .ld-vinyl-photo — inset 12%, cover-cropped. With no photo the preview
-  // paints the song gradient into that box instead, so do the same here.
-  const inset = 0.12 * disc;
-  const px = dx + inset;
-  const py = dy + inset;
-  const pw = disc - inset * 2;
-  const ph = disc - inset * 2;
-  if (photo) drawCover(ctx, photo, px, py, pw, ph);
+  // .ld-vinyl-photo — inset 12% and clipped to the inner circle. With no photo
+  // the preview paints the song gradient into that box instead, so do the same.
+  const inner = r - 0.12 * disc;
+  const ix = cx - inner;
+  const iy = cy - inner;
+  const isz = inner * 2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, inner, 0, Math.PI * 2);
+  ctx.clip();
+  if (photo) drawCover(ctx, photo, ix, iy, isz, isz);
   else {
-    ctx.fillStyle = cssLinearGradient(ctx, song?.gradient, px, py, pw, ph) || '#111';
-    ctx.fillRect(px, py, pw, ph);
+    ctx.fillStyle = cssLinearGradient(ctx, song?.gradient, ix, iy, isz, isz) || '#111';
+    ctx.fillRect(ix, iy, isz, isz);
   }
+  ctx.restore();
 
-  // .ld-vinyl-grooves — inset box-shadows at 4/11/18/25px. Each translucent
-  // white band stacks over the ones beneath it, so paint thick → thin.
+  // .ld-vinyl-grooves — circular inset rings at 4/11/18/25px. Each translucent
+  // white band stacks over the ones beneath it, so paint thick → thin. Two
+  // subpaths per ring + the even-odd rule turn the disc into an annulus.
   ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
   [25, 18, 11, 4].forEach((t) => {
     const k = t * s;
     ctx.beginPath();
-    ctx.rect(dx, dy, disc, disc);
-    ctx.rect(dx + k, dy + k, disc - k * 2, disc - k * 2);
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r - k, 0, Math.PI * 2);
     ctx.fill('evenodd');
   });
 
-  // .ld-vinyl-hole — 8% of the disc, dead centre, painted last (z-index 3).
+  // .ld-vinyl-hole — 8% of the disc, dead centre, painted last (z-index 3),
+  // with the CSS's 2px light hub ring sitting just outside its edge.
   const hole = 0.08 * disc;
+  ctx.beginPath();
+  ctx.arc(cx, cy, hole / 2, 0, Math.PI * 2);
   ctx.fillStyle = '#141416';
-  ctx.fillRect(dx + (disc - hole) / 2, dy + (disc - hole) / 2, hole, hole);
+  ctx.fill();
+  ctx.save();
+  ctx.lineWidth = 2 * s;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, hole / 2 + s, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 
   // .ld-vinyl-caption (bottom-anchored, wraps unbounded in the preview) +
   // the corner watermark.
   const capFS = 8.5 * s;
   const capLH = capFS * 1.2;
   const capW = w - 20 * s;
-  const capBottom = h - 0.09 * h;
-  const maxCapLines = Math.max(1, Math.floor((capBottom - (dy + disc) - 8 * s) / capLH));
+  const capBottom = h - 0.12 * h; // .ld-vinyl-caption bottom — clears the corner logo
+  const maxCapLines = Math.max(1, Math.floor((capBottom - (cy + r) - 8 * s) / capLH));
   ctx.save();
   ctx.font = `600 ${capFS}px ${FONT_STACK}`;
   const capLines = wrapText(ctx, `${song.title} — ${song.artist}`, capW, maxCapLines);
@@ -421,10 +471,10 @@ function paintVinyl(ctx, w, h, s, song, photo) {
       maxWidth: capW,
     });
   });
-  drawWatermark(ctx, { edge: w - 8 * s, y: h - 8 * s - 11 * s, align: 'right', label: 'laradama.ai', s });
+  drawWatermark(ctx, { edge: w - 8 * s, y: h - 8 * s - 20 * s, align: 'right', label: 'laradama', s, logo });
 }
 
-function paintNeon(ctx, w, h, s, song, photo) {
+function paintNeon(ctx, w, h, s, song, photo, logo) {
   paintBackdrop(ctx, w, h, s, song, photo, 'cover');
 
   // .ld-neon-duotone — mix-blend-mode: color over the photo only, so it runs
@@ -442,6 +492,9 @@ function paintNeon(ctx, w, h, s, song, photo) {
     ) || 'rgba(30, 215, 96, 0.4)';
   ctx.fillRect(0, 0, w, h);
   ctx.restore();
+
+  // .ld-story-wm — top-left, above the duotone (z-index 2 in the preview).
+  drawWatermark(ctx, { edge: 8 * s, y: 8 * s, align: 'left', label: 'laradama', s, logo });
 
   // .ld-neon-eq — 7 bars, 3px wide, 3px apart, sitting on the 24% line.
   const barW = 3 * s;
@@ -489,7 +542,7 @@ function paintNeon(ctx, w, h, s, song, photo) {
   ctx.font = `400 ${stripFS}px ${FONT_STACK}`;
   const stripLines = wrapText(
     ctx,
-    'LARADAMA.AI  •  LARADAMA.AI  •  LARADAMA.AI',
+    'laradama  •  laradama  •  laradama',
     w,
     Math.max(1, Math.floor((0.1 * h) / stripLH)),
   );
@@ -555,7 +608,8 @@ export async function renderStoryImage({
     : null;
 
   const paint = PAINTERS[templateId] || paintClean;
-  paint(ctx, width, height, s, song, photo);
+  const logo = await loadLogo();
+  paint(ctx, width, height, s, song, photo, logo);
 
   return await new Promise((resolve, reject) => {
     try {
