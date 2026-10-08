@@ -17,7 +17,7 @@ export async function resolveSpotifyTrack(title, artist) {
   try {
     const q = encodeURIComponent(`${title} ${artist}`);
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 7000);
+    const t = setTimeout(() => ctrl.abort(), 3000); // best-effort: the deck never waits long for a link
     let res;
     try {
       res = await fetch(`/api/spotify/search?q=${q}&type=track&limit=5`, {

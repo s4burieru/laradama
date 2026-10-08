@@ -95,8 +95,9 @@
 .ld-song-card .ld-artist { font-size: 13px; color: var(--color-laradama-dim); margin-bottom: 14px; }
 .ld-progress { height: 3px; background: var(--color-laradama-line); margin-bottom: 6px; overflow: hidden; cursor: pointer; }
 .ld-progress > div { height: 100%; width: 34%; background: var(--color-laradama-brand); }
-.ld-time-row { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--color-laradama-dimmer); font-family: var(--font-mono); margin-bottom: 8px; }
+.ld-time-row { position: relative; display: flex; justify-content: space-between; font-size: 10.5px; color: var(--color-laradama-dimmer); font-family: var(--font-mono); margin-bottom: 8px; }
 .ld-transport { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.ld-tp-controls { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .ld-tp-btn { width: 34px; height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--color-laradama-surface); border: 1px solid var(--color-laradama-line); color: var(--color-laradama-ink); cursor: pointer; transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.12s; }
 .ld-tp-btn:hover:not(:disabled) { border-color: var(--color-laradama-brand); color: var(--color-laradama-brand); transform: translateY(-1px); }
 .ld-tp-btn:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -104,17 +105,19 @@
 .ld-tp-btn.primary:hover:not(:disabled) { background: var(--color-laradama-brand-hover); border-color: var(--color-laradama-brand-hover); color: #06170c; }
 .ld-tp-btn.buffering { animation: ld-blink 0.9s ease-in-out infinite; }
 @keyframes ld-blink { 50% { opacity: 0.45; } }
-.ld-tp-status { margin-left: auto; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-laradama-dimmer); }
+.ld-tp-status { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); white-space: nowrap; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-laradama-dimmer); }
 .ld-share-label { font-size: 9.5px; color: var(--color-laradama-dimmer); font-family: var(--font-mono); display: block; margin-bottom: 7px; }
 .ld-action-row { display: flex; gap: 8px; margin-bottom: 12px; }
 .ld-spotify-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; height: 40px; background: #000; border: 1px solid var(--color-laradama-brand); color: var(--color-laradama-ink); font-size: 12px; font-weight: 700; cursor: pointer; transition: background 0.15s, transform 0.12s; }
-.ld-spotify-btn:hover { background: #111; transform: translateY(-1px); }
+.ld-spotify-btn:hover:not(:disabled) { background: #111; transform: translateY(-1px); }
 .ld-spotify-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
 .ld-icon-btn { width: 40px; height: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; transition: transform 0.12s; }
-.ld-icon-btn:hover { transform: translateY(-2px); }
+.ld-icon-btn:hover:not(:disabled) { transform: translateY(-2px); }
 .ld-icon-btn.ig { background: linear-gradient(135deg, #4f5bd5, #962fbf, #d62976, #fa7e1e, #feda75); }
 .ld-icon-btn.fb { background: #1877f2; }
 .ld-icon-btn svg { width: 17px; height: 17px; }
+/* While a photo is being matched there is no track to listen to or share yet. */
+.ld-spotify-btn:disabled, .ld-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
 
 .ld-why-toggle { display: flex; align-items: center; gap: 8px; background: none; border: 1px dashed var(--color-laradama-line); color: var(--color-laradama-dim); font-size: 12px; font-weight: 600; padding: 9px 12px; cursor: pointer; margin-top: auto; transition: border-color 0.15s, color 0.15s; }
 .ld-why-toggle:hover { border-color: var(--color-laradama-coral); color: var(--color-laradama-coral); }
@@ -174,6 +177,7 @@
   .ld-song-card .ld-title { font-size: 17px; }
   .ld-song-card .ld-artist { font-size: 12.5px; margin-bottom: 10px; }
   .ld-transport { gap: 6px; margin-bottom: 12px; }
+  .ld-tp-controls { gap: 6px; }
   .ld-action-row { margin-bottom: 10px; }
   .ld-why-toggle { padding: 8px 10px; font-size: 11.5px; }
   .ld-why-panel { padding: 10px; font-size: 12px; }
@@ -185,50 +189,116 @@
 /* ---------- STORY TEMPLATE MODAL ---------- */
 .ld-modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
 .ld-modal-overlay.open { display: flex; }
-.ld-modal-panel { background: var(--color-laradama-elevated); border: 1px solid var(--color-laradama-line); padding: 26px; max-width: 420px; width: 100%; max-height: 92vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); }
+/* padding-bottom lives on .ld-modal-foot instead: a sticky footer pinned at
+   bottom: 0 stops at the content box, so a panel bottom-padding would leave a
+   strip where scrolled content peeks out beneath it. */
+.ld-modal-panel { background: var(--color-laradama-elevated); border: 1px solid var(--color-laradama-line); padding: 26px 26px 0; max-width: 420px; width: 100%; max-height: 92vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); }
 .ld-modal-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
 .ld-modal-head h3 { font-size: 18px; font-weight: 700; font-family: var(--font-display); }
 .ld-modal-head p { font-size: 12.5px; color: var(--color-laradama-dim); margin-top: 4px; max-width: 280px; }
 .ld-modal-close { background: none; border: none; color: var(--color-laradama-dim); font-size: 20px; cursor: pointer; line-height: 1; padding: 4px; }
 .ld-modal-close:hover { color: var(--color-laradama-ink); }
 
-.ld-story-card { position: relative; aspect-ratio: 9 / 16; overflow: hidden; background: #0a0a0a; }
-.ld-story-card.ld-big { width: 150px; margin: 18px auto 16px; border: 1px solid var(--color-laradama-line); }
+/* `display: block` lets a template tile render its frame as a <span> — the
+   tiles are <button>s, which may only contain phrasing content.
+
+   The card is also a size container. Every length below is written as
+   `calc(<px> * var(--ld-u))`, and --ld-u is 1px of the 150px design that
+   storyImage.js exports (it scales by width / 150). At the 150px big preview
+   those calc()s evaluate to exactly the px values the canvas draws — while a
+   thumb at ~84px (or 2-up on a phone) becomes a true miniature instead of
+   fixed 11px text spilling out of a much narrower box. */
+.ld-story-card { display: block; position: relative; aspect-ratio: 9 / 16; overflow: hidden; background: #0a0a0a; container-type: inline-size; --ld-u: 0.66667cqw; }
+/* The frame line is drawn with an inset shadow rather than a border: container
+   query units measure the *content* box, so a border would shrink every
+   calc() below by ~1.3% and drift from the canvas export (150px exactly here
+   = the design width storyImage.js scales from). */
+.ld-story-card.ld-big { width: 150px; margin: 18px auto 16px; box-shadow: inset 0 0 0 1px var(--color-laradama-line); }
 .ld-story-card.thumb { width: 100%; cursor: pointer; }
 
 .ld-story-bg { position: absolute; inset: 0; background-size: cover; background-position: center; }
 .ld-story-bg.contain { background-size: contain; background-repeat: no-repeat; background-color: #000; }
 .ld-story-bg.blurbg { filter: blur(16px) brightness(0.4); transform: scale(1.3); }
 .ld-story-scrim-b { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, 0.85) 100%); }
-.ld-story-wm { position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 4px; font-family: var(--font-display); font-weight: 700; font-size: 9px; color: #fff; z-index: 2; }
-.ld-story-wm.corner { top: auto; bottom: 8px; right: 8px; left: auto; }
-.ld-story-wm .ld-dotmark { width: 11px; height: 11px; background: linear-gradient(135deg, var(--color-laradama-brand), var(--color-laradama-brand-deep)); flex-shrink: 0; }
-.ld-story-info { position: absolute; bottom: 10px; left: 10px; right: 10px; z-index: 2; }
-.ld-story-title { font-family: var(--font-display); font-weight: 700; color: #fff; font-size: 11px; line-height: 1.2; }
-.ld-story-artist { color: rgba(255, 255, 255, 0.75); font-size: 8.5px; margin-top: 1px; }
+.ld-story-wm { position: absolute; top: calc(8 * var(--ld-u)); left: calc(8 * var(--ld-u)); display: flex; align-items: center; gap: calc(4 * var(--ld-u)); font-family: var(--font-display); font-weight: 700; font-size: calc(9 * var(--ld-u)); color: #fff; z-index: 2; }
+.ld-story-wm.corner { top: auto; bottom: calc(8 * var(--ld-u)); right: calc(8 * var(--ld-u)); left: auto; }
+/* The mascot logo (transparent PNG, 3:2) is the brand mark on every template.
+   Keep it square so the face reads as a round badge; `contain` never crops it.
+   storyImage.js draws the identical box (20 * s) into the exported PNG. */
+.ld-story-logo { display: block; width: calc(20 * var(--ld-u)); height: calc(20 * var(--ld-u)); border-radius: 50%; object-fit: contain; flex-shrink: 0; }
+.ld-story-info { position: absolute; bottom: calc(10 * var(--ld-u)); left: calc(10 * var(--ld-u)); right: calc(10 * var(--ld-u)); z-index: 2; }
+.ld-story-title { font-family: var(--font-display); font-weight: 700; color: #fff; font-size: calc(11 * var(--ld-u)); line-height: 1.2; }
+.ld-story-artist { color: rgba(255, 255, 255, 0.75); font-size: calc(8.5 * var(--ld-u)); margin-top: calc(1 * var(--ld-u)); }
 
-.ld-meme-bar { position: absolute; left: 0; right: 0; background: #fff; color: #000; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; text-align: center; font-size: 7.8px; padding: 5px 6px; line-height: 1.25; z-index: 2; }
-.ld-meme-bar.top { top: 0; }
+.ld-meme-bar { position: absolute; left: 0; right: 0; background: #fff; color: #000; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; text-align: center; font-size: calc(7.8 * var(--ld-u)); padding: calc(5 * var(--ld-u)) calc(6 * var(--ld-u)); line-height: 1.25; z-index: 2; }
+/* `.top` runs a hair smaller than the bottom bar: the caption is centred, and
+   at 7.8 it started around x=17 — exactly where the logo at x=4..17 ends. */
+.ld-meme-bar.top { top: 0; font-size: calc(7 * var(--ld-u)); }
 .ld-meme-bar.bottom { bottom: 0; }
+/* The bar is already a containing block (absolute), so the mark tucks into its
+   top-left corner without moving the centred text. Capped at 13 design px: the
+   caption ("MY PHOTO'S SOUNDTRACK IS") starts around x=17 of the 150px card,
+   so a bigger mark would sit on top of it. */
+.ld-meme-bar .ld-story-logo { position: absolute; top: calc(3 * var(--ld-u)); left: calc(4 * var(--ld-u)); width: calc(13 * var(--ld-u)); height: calc(13 * var(--ld-u)); }
 
-.ld-vinyl-disc { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); width: 62%; aspect-ratio: 1 / 1; background: #111; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); z-index: 2; }
-.ld-vinyl-photo { position: absolute; inset: 12%; background-size: cover; background-position: center; }
-.ld-vinyl-grooves { position: absolute; inset: 0; box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.05), inset 0 0 0 11px rgba(255, 255, 255, 0.05), inset 0 0 0 18px rgba(255, 255, 255, 0.05), inset 0 0 0 25px rgba(255, 255, 255, 0.05); }
-.ld-vinyl-hole { width: 8%; aspect-ratio: 1 / 1; background: var(--color-laradama-elevated); z-index: 3; }
-.ld-vinyl-caption { position: absolute; bottom: 9%; left: 0; right: 0; text-align: center; font-family: var(--font-display); color: #fff; font-size: 8.5px; font-weight: 600; z-index: 2; padding: 0 10px; }
+/* A disc, not a sleeve: every layer is clipped to the same circle so the
+   photo, grooves and hub follow the round edge. */
+.ld-vinyl-disc { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); width: 62%; aspect-ratio: 1 / 1; border-radius: 50%; background: #111; display: flex; align-items: center; justify-content: center; box-shadow: 0 calc(8 * var(--ld-u)) calc(24 * var(--ld-u)) rgba(0, 0, 0, 0.5); z-index: 2; }
+.ld-vinyl-photo { position: absolute; inset: 12%; border-radius: 50%; background-size: cover; background-position: center; }
+.ld-vinyl-grooves { position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 calc(4 * var(--ld-u)) rgba(255, 255, 255, 0.05), inset 0 0 0 calc(11 * var(--ld-u)) rgba(255, 255, 255, 0.05), inset 0 0 0 calc(18 * var(--ld-u)) rgba(255, 255, 255, 0.05), inset 0 0 0 calc(25 * var(--ld-u)) rgba(255, 255, 255, 0.05); }
+.ld-vinyl-hole { width: 8%; aspect-ratio: 1 / 1; border-radius: 50%; background: var(--color-laradama-elevated); box-shadow: 0 0 0 calc(2 * var(--ld-u)) rgba(255, 255, 255, 0.14); z-index: 3; }
+/* bottom 12% (was 9%) — the corner watermark's logo grew to 20px, so the
+   caption needs the extra headroom to never run into it. */
+.ld-vinyl-caption { position: absolute; bottom: 12%; left: 0; right: 0; text-align: center; font-family: var(--font-display); color: #fff; font-size: calc(8.5 * var(--ld-u)); font-weight: 600; z-index: 2; padding: 0 calc(10 * var(--ld-u)); }
 
 .ld-neon-duotone { position: absolute; inset: 0; background: linear-gradient(160deg, rgba(30, 215, 96, 0.55), rgba(255, 107, 74, 0.5)); mix-blend-mode: color; z-index: 1; }
-.ld-neon-eq { position: absolute; bottom: 24%; left: 0; right: 0; display: flex; justify-content: center; gap: 3px; z-index: 2; }
-.ld-neon-eq span { width: 3px; background: #fff; animation: eq 1s ease-in-out infinite; }
-.ld-neon-title { position: absolute; bottom: 13%; left: 0; right: 0; text-align: center; font-family: var(--font-display); font-weight: 700; color: #fff; font-size: 9px; letter-spacing: 0.02em; z-index: 2; text-shadow: 0 0 8px rgba(0, 0, 0, 0.6); padding: 0 8px; }
-.ld-neon-wm-strip { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0, 0, 0, 0.5); color: rgba(255, 255, 255, 0.65); font-family: var(--font-mono); font-size: 6px; padding: 3px 0; text-align: center; letter-spacing: 0.04em; z-index: 2; }
+.ld-neon-eq { position: absolute; bottom: 24%; left: 0; right: 0; display: flex; justify-content: center; gap: calc(3 * var(--ld-u)); z-index: 2; }
+/* font-size = 1 design px, so the keyframe below can speak in em and still
+   track the card's width. Own keyframes: the shared `eq` also drives the song
+   card's bars, which are not inside a story container. */
+.ld-neon-eq span { width: calc(3 * var(--ld-u)); background: #fff; font-size: var(--ld-u); animation: ld-story-eq 1s ease-in-out infinite; }
+@keyframes ld-story-eq { 0%, 100% { height: 14em; } 50% { height: 44em; } }
+.ld-neon-title { position: absolute; bottom: 13%; left: 0; right: 0; text-align: center; font-family: var(--font-display); font-weight: 700; color: #fff; font-size: calc(9 * var(--ld-u)); letter-spacing: 0.02em; z-index: 2; text-shadow: 0 0 calc(8 * var(--ld-u)) rgba(0, 0, 0, 0.6); padding: 0 calc(8 * var(--ld-u)); }
+.ld-neon-wm-strip { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0, 0, 0, 0.5); color: rgba(255, 255, 255, 0.65); font-family: var(--font-mono); font-size: calc(6 * var(--ld-u)); padding: calc(3 * var(--ld-u)) 0; text-align: center; letter-spacing: 0.04em; z-index: 2; }
 
 .ld-template-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .ld-thumb-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.ld-thumb-wrap .ld-story-card { border: 2px solid transparent; transition: border-color 0.15s; }
-.ld-thumb-wrap.selected .ld-story-card { border-color: var(--color-laradama-brand); box-shadow: 0 0 0 2px rgba(30, 215, 96, 0.2); }
+/* Same idea on the tiles: the selection ring is an inset shadow, so a thumb's
+   inner design scales purely with its width (no 2px border tax). */
+.ld-thumb-wrap .ld-story-card { box-shadow: inset 0 0 0 2px transparent; transition: box-shadow 0.15s; }
+.ld-thumb-wrap.selected .ld-story-card { box-shadow: inset 0 0 0 2px var(--color-laradama-brand), 0 0 0 2px rgba(30, 215, 96, 0.2); }
 .ld-thumb-label { font-size: 9.5px; color: var(--color-laradama-dim); font-family: var(--font-mono); }
-.ld-modal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+
+/* A tile in the modal is a real <button>: Tab / Enter / Space and the
+   accessible name come for free, and the selected tile is marked with a check
+   instead of only a colour. The 4px pad is paid back with margin: -4px, so the
+   card itself keeps exactly the width the grid track gives it. */
+.ld-thumb-btn { position: relative; padding: 4px; margin: -4px; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; border-radius: 4px; transition: background-color 0.15s, transform 0.15s; }
+.ld-thumb-btn:hover { background: rgba(255, 255, 255, 0.06); transform: translateY(-2px); }
+.ld-thumb-btn:focus-visible { outline: 2px solid var(--color-laradama-brand); outline-offset: 3px; }
+.ld-thumb-check { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--color-laradama-brand); color: #06170c; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(0.6); transition: opacity 0.15s, transform 0.15s; pointer-events: none; }
+.ld-thumb-btn.selected .ld-thumb-check { opacity: 1; transform: scale(1); }
+
+.ld-template-hint { margin-top: 12px; text-align: center; font-family: var(--font-mono); font-size: 10.5px; color: var(--color-laradama-dimmer); }
+.ld-template-hint kbd { font-family: inherit; color: var(--color-laradama-dim); }
+
+/* Phones: four ~70px tiles are hard to hit, so the picker drops to 2x2. At
+   that width the tiles are already nearly preview-sized, so the 150px card
+   above them is a duplicate that pushes row two under the sticky footer. */
+@media (max-width: 420px) {
+  .ld-template-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .ld-story-card.ld-big { display: none; }
+  /* three lines that push the second row under the footer; the Share button
+     already says where the story goes. Same for the keyboard hint — there are
+     no arrow keys on a phone, and dropping it is what makes the panel fit
+     without scrolling. */
+  .ld-modal-head p { display: none; }
+  .ld-template-hint { display: none; }
+}
+/* Actions + status pin to the bottom of the panel while it scrolls, so
+   Download / Post stay reachable on a short phone screen. */
+.ld-modal-foot { position: sticky; bottom: 0; margin-top: 24px; padding-top: 14px; padding-bottom: 26px; background: var(--color-laradama-elevated); box-shadow: 0 -14px 16px -12px var(--color-laradama-elevated); z-index: 3; }
+.ld-modal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .ld-modal-actions button { min-width: max-content; justify-content: center; font-size: 12.5px; padding: 11px 12px; }
 .ld-modal-actions button:disabled { opacity: 0.65; cursor: progress; }
 .ld-share-status { margin-top: 14px; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; color: var(--color-laradama-dim); }
