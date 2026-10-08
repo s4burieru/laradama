@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, FastForward, Pause, Play, Plus, SkipForward } from "lucide-react";
+import { ArrowRight, FastForward, Pause, Play, Plus, Rewind, SkipBack, SkipForward } from "lucide-react";
 import { findMoreSongs, matchImageToTracks } from "../lib/match.js";
 import { spotifySearchUrl } from "../lib/spotify.js";
 import { renderStoryImage } from "../lib/storyImage.js";
@@ -119,17 +119,20 @@ export function renderStoryTemplate(s, id, uploadedImage = null) {
   const bg = uploadedImage
     ? `background-image:url(${uploadedImage})`
     : `background:${s.gradient}`;
+  // Brand mark shared by every template — the same file storyImage.js paints
+  // into the exported PNG, so preview and export stay identical.
+  const logo = `<img class="ld-story-logo" src="/laradama-logo.png" alt="">`;
   if (id === "clean") {
-    return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-story-scrim-b"></div><div class="ld-story-wm"><span class="ld-dotmark"></span>Laradama</div><div class="ld-story-info"><div class="ld-story-title">${s.title}</div><div class="ld-story-artist">${s.artist} · trending now</div></div>`;
+    return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-story-scrim-b"></div><div class="ld-story-wm">${logo}laradama</div><div class="ld-story-info"><div class="ld-story-title">${s.title}</div><div class="ld-story-artist">${s.artist} · trending now</div></div>`;
   }
   if (id === "meme") {
-    return `<div class="ld-story-bg contain" style="${bg}"></div><div class="ld-meme-bar top">my photo's soundtrack is</div><div class="ld-meme-bar bottom">${s.title}</div>`;
+    return `<div class="ld-story-bg contain" style="${bg}"></div><div class="ld-meme-bar top">${logo}my photo's soundtrack is</div><div class="ld-meme-bar bottom">${s.title}</div>`;
   }
   if (id === "vinyl") {
-    return `<div class="ld-story-bg blurbg" style="${bg}"></div><div class="ld-vinyl-disc"><div class="ld-vinyl-photo" style="${bg}"></div><div class="ld-vinyl-grooves"></div><div class="ld-vinyl-hole"></div></div><div class="ld-vinyl-caption">${s.title} — ${s.artist}</div><div class="ld-story-wm corner"><span class="ld-dotmark"></span>laradama.ai</div>`;
+    return `<div class="ld-story-bg blurbg" style="${bg}"></div><div class="ld-vinyl-disc"><div class="ld-vinyl-photo" style="${bg}"></div><div class="ld-vinyl-grooves"></div><div class="ld-vinyl-hole"></div></div><div class="ld-vinyl-caption">${s.title} — ${s.artist}</div><div class="ld-story-wm corner">${logo}laradama</div>`;
   }
   if (id === "neon") {
-    return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-neon-duotone"></div><div class="ld-neon-eq">${"<span></span>".repeat(7)}</div><div class="ld-neon-title">${s.title}</div><div class="ld-neon-wm-strip">LARADAMA.AI &nbsp;•&nbsp; LARADAMA.AI &nbsp;•&nbsp; LARADAMA.AI</div>`;
+    return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-neon-duotone"></div><div class="ld-story-wm">${logo}laradama</div><div class="ld-neon-eq">${"<span></span>".repeat(7)}</div><div class="ld-neon-title">${s.title}</div><div class="ld-neon-wm-strip">laradama &nbsp;•&nbsp; laradama &nbsp;•&nbsp; laradama</div>`;
   }
   return "";
 }
@@ -383,6 +386,18 @@ export default function Hero() {
     advance();
   };
 
+  /**
+   * One step back through the deck — the pair to "next". The deck only ever
+   * grows in front of us, so every track we already passed is still in `pool`
+   * and going back needs no refill; it just rewinds `idx` and restarts the
+   * audio from the top of that track.
+   */
+  const prevTrack = () => {
+    if (swipeDir || analyzing || idx === 0) return;
+    setIdx((i) => Math.max(0, i - 1));
+    setWhyOpen(false);
+  };
+
   const onAudioEnded = () => {
     setPlaying(false);
     nextTrack(); // keep the music going — roll straight into the next match
@@ -399,14 +414,86 @@ export default function Hero() {
 
   const templateInner = (s, id) => renderStoryTemplate(s, id, uploadedImage);
 
-  // Escape closes the story modal (the ✕ and the overlay already do).
+  // Everything the story modal needs: the panel to keep Tab inside, the four
+  // tiles for the arrow-key cursor, and whatever opened it so focus can go back.
+  const modalPanelRef = useRef(null);
+  const thumbRefs = useRef([]);
+  const modalOpenerRef = useRef(null);
+
+  /** Select a template by its index in `storyTemplates` (0-based). */
+  const selectTemplate = (i) => {
+    const pick = storyTemplates[i];
+    if (!pick) return;
+    setCurrentTemplate(pick.id);
+    // the previous "Saved …" line belongs to the old template
+    setShare({ phase: "idle", message: "" });
+  };
+
+  /** ←/→ (and ↑/↓) walk the picker, wrapping at both ends, and take focus. */
+  const onThumbKeyDown = (e, i) => {
+    const steps = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+    const n = storyTemplates.length;
+    let next = null;
+    if (e.key in steps) next = (i + steps[e.key] + n) % n;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = n - 1;
+    if (next === null) return;
+    e.preventDefault();
+    selectTemplate(next);
+    thumbRefs.current[next]?.focus();
+  };
+
+  /** Keep Tab inside the dialog — the page behind it is still focusable. */
+  const trapFocus = (e) => {
+    if (e.key !== "Tab") return;
+    const panel = modalPanelRef.current;
+    if (!panel) return;
+    const items = Array.from(
+      panel.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'),
+    ).filter((el) => el.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    } else if (!panel.contains(document.activeElement)) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
+  // Escape closes the story modal (the ✕ and the overlay already do), and the
+  // moment it opens focus lands on the selected tile, so ←/→ start browsing
+  // without a Tab hunt first.
   useEffect(() => {
     if (!modalOpen) return undefined;
     const onKey = (e) => {
       if (e.key === "Escape") setModalOpen(false);
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const raf = requestAnimationFrame(() => {
+      const i = storyTemplates.findIndex((t) => t.id === currentTemplate);
+      thumbRefs.current[i < 0 ? 0 : i]?.focus();
+    });
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      cancelAnimationFrame(raf);
+    };
+  }, [modalOpen, currentTemplate]);
+
+  // ...and when it closes, focus goes back to the button that opened it, so
+  // the next Tab doesn't start over at the top of the page. Runs for every
+  // close path (✕, overlay, Esc, Cancel, a successful share).
+  useEffect(() => {
+    if (modalOpen) return undefined;
+    const opener = modalOpenerRef.current;
+    modalOpenerRef.current = null;
+    if (opener && document.contains(opener) && typeof opener.focus === "function") opener.focus();
+    return undefined;
   }, [modalOpen]);
 
   const shareBusy = share.phase === "working";
@@ -419,9 +506,13 @@ export default function Hero() {
         ? " ok"
         : "";
 
-  const openStoryModal = (platform) => {
+  const openStoryModal = (platform, opener = null) => {
+    // remember the actual control that opened it — `document.activeElement` is
+    // only reliable after a real mouse/keyboard focus, not a programmatic click
+    modalOpenerRef.current = opener || document.activeElement;
     setCurrentPlatform(platform);
-    setCurrentTemplate("clean");
+    // the last picked template is remembered — reopening shouldn't cost a
+    // re-selection every time
     setShare({ phase: "idle", message: "" });
     setModalOpen(true);
   };
@@ -680,54 +771,76 @@ export default function Hero() {
                       </div>
                       <div className="ld-time-row">
                         <span>{hasAudio ? fmtTime(progress.current) || "0:00" : "0:42"}</span>
+                        <span className="ld-tp-status">{statusLabel}</span>
                         <span>{hasAudio ? fmtTime(progress.duration) || "0:00" : "2:58"}</span>
                       </div>
                       <div className="ld-transport">
-                        <button
-                          className={`ld-tp-btn primary${buffering ? " buffering" : ""}`}
-                          type="button"
-                          onClick={toggleAudio}
-                          disabled={!hasAudio}
-                          aria-label={playing ? "Pause" : "Play"}
-                          title={playing ? "Pause" : "Play"}
-                        >
-                          {playing ? (
-                            <Pause size={15} strokeWidth={2.4} fill="currentColor" />
-                          ) : (
-                            <Play size={15} strokeWidth={2.4} fill="currentColor" />
-                          )}
-                        </button>
-                        <button
-                          className="ld-tp-btn"
-                          type="button"
-                          onClick={() => seekBy(10)}
-                          disabled={!hasAudio}
-                          aria-label="Fast forward 10 seconds"
-                          title="Fast forward 10s"
-                        >
-                          <FastForward size={14} strokeWidth={2.2} />
-                        </button>
-                        <button
-                          className={`ld-tp-btn${fetchingMore ? " buffering" : ""}`}
-                          type="button"
-                          onClick={nextTrack}
-                          disabled={analyzing || pool.length < 2}
-                          aria-label="Skip to the next track"
-                          title={fetchingMore ? "Loading more tracks…" : "Next track"}
-                        >
-                          <SkipForward size={14} strokeWidth={2.2} />
-                        </button>
-                        <span className="ld-tp-status">{statusLabel}</span>
+                        <div className="ld-tp-controls">
+                          <button
+                            className="ld-tp-btn"
+                            type="button"
+                            onClick={prevTrack}
+                            disabled={analyzing || idx === 0}
+                            aria-label="Go back to the previous track"
+                            title="Previous track"
+                          >
+                            <SkipBack size={14} strokeWidth={2.2} />
+                          </button>
+                          <button
+                            className="ld-tp-btn"
+                            type="button"
+                            onClick={() => seekBy(-10)}
+                            disabled={!hasAudio}
+                            aria-label="Rewind 10 seconds"
+                            title="Rewind 10s"
+                          >
+                            <Rewind size={14} strokeWidth={2.2} />
+                          </button>
+                          <button
+                            className={`ld-tp-btn primary${buffering ? " buffering" : ""}`}
+                            type="button"
+                            onClick={toggleAudio}
+                            disabled={!hasAudio}
+                            aria-label={playing ? "Pause" : "Play"}
+                            title={playing ? "Pause" : "Play"}
+                          >
+                            {playing ? (
+                              <Pause size={15} strokeWidth={2.4} fill="currentColor" />
+                            ) : (
+                              <Play size={15} strokeWidth={2.4} fill="currentColor" />
+                            )}
+                          </button>
+                          <button
+                            className="ld-tp-btn"
+                            type="button"
+                            onClick={() => seekBy(10)}
+                            disabled={!hasAudio}
+                            aria-label="Fast forward 10 seconds"
+                            title="Fast forward 10s"
+                          >
+                            <FastForward size={14} strokeWidth={2.2} />
+                          </button>
+                          <button
+                            className={`ld-tp-btn${fetchingMore ? " buffering" : ""}`}
+                            type="button"
+                            onClick={nextTrack}
+                            disabled={analyzing || pool.length < 2}
+                            aria-label="Skip to the next track"
+                            title={fetchingMore ? "Loading more tracks…" : "Next track"}
+                          >
+                            <SkipForward size={14} strokeWidth={2.2} />
+                          </button>
+                        </div>
                       </div>
                       <span className="ld-share-label">LISTEN & SHARE</span>
                       <div className="ld-action-row">
-                        <button className="ld-spotify-btn" id="spotifyBtn" type="button" aria-label="Listen on Spotify" onClick={() => window.open(song.spotifyUrl || spotifySearchUrl(song.title, song.artist), "_blank")}>
+                        <button className="ld-spotify-btn" id="spotifyBtn" type="button" aria-label="Listen on Spotify" disabled={analyzing} title={analyzing ? "Matching your photo…" : "Listen on Spotify"} onClick={() => window.open(song.spotifyUrl || spotifySearchUrl(song.title, song.artist), "_blank")}>
                           <SpotifyIcon /> Listen on Spotify
                         </button>
-                        <button className="ld-icon-btn ig" id="igBtn" type="button" aria-label="Add to Instagram Story" title="Add to Instagram Story" onClick={() => openStoryModal("Instagram")}>
+                        <button className="ld-icon-btn ig" id="igBtn" type="button" aria-label="Add to Instagram Story" disabled={analyzing} title={analyzing ? "Matching your photo…" : "Add to Instagram Story"} onClick={(e) => openStoryModal("Instagram", e.currentTarget)}>
                           <InstagramIcon />
                         </button>
-                        <button className="ld-icon-btn fb" id="fbBtn" type="button" aria-label="Add to Facebook Story" title="Add to Facebook Story" onClick={() => openStoryModal("Facebook")}>
+                        <button className="ld-icon-btn fb" id="fbBtn" type="button" aria-label="Add to Facebook Story" disabled={analyzing} title={analyzing ? "Matching your photo…" : "Add to Facebook Story"} onClick={(e) => openStoryModal("Facebook", e.currentTarget)}>
                           <FacebookIcon />
                         </button>
                       </div>
@@ -762,12 +875,19 @@ export default function Hero() {
         id="storyModal"
         onClick={(e) => { if (e.target.id === "storyModal") closeStoryModal(); }}
       >
-        <div className="ld-modal-panel">
+        <div
+          className="ld-modal-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="storyModalTitle"
+          ref={modalPanelRef}
+          onKeyDown={trapFocus}
+        >
           <div className="ld-modal-head">
             <div>
-              <h3>Choose a story template</h3>
+              <h3 id="storyModalTitle">Choose a story template</h3>
               <p>
-                Your photo, the track, and a Laradama watermark — pick a style before
+                Your photo, the track, and a laradama watermark — pick a style before
                 posting to <span id="modalPlatform">{currentPlatform}</span>.
               </p>
             </div>
@@ -778,40 +898,50 @@ export default function Hero() {
             id="bigPreview"
             dangerouslySetInnerHTML={{ __html: templateInner(song, currentTemplate) }}
           />
-          <div className="ld-template-grid" id="templateGrid">
-            {storyTemplates.map((t) => (
-              <div
-                key={t.id}
-                className={`ld-thumb-wrap${currentTemplate === t.id ? " selected" : ""}`}
-                onClick={() => {
-                  setCurrentTemplate(t.id);
-                  // the previous "Saved …" line belongs to the old template
-                  setShare({ phase: "idle", message: "" });
-                }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setCurrentTemplate(t.id); }}
-              >
-                <div
-                  className="ld-story-card thumb"
-                  dangerouslySetInnerHTML={{ __html: templateInner(song, t.id) }}
-                />
-                <span className="ld-thumb-label">{t.label}</span>
-              </div>
-            ))}
+          {/* Radiogroup + roving tabindex: one Tab stop, ←/→ to browse. */}
+          <div className="ld-template-grid" id="templateGrid" role="radiogroup" aria-label="Story templates">
+            {storyTemplates.map((t, i) => {
+              const selected = currentTemplate === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  tabIndex={selected ? 0 : -1}
+                  className={`ld-thumb-wrap ld-thumb-btn${selected ? " selected" : ""}`}
+                  ref={(el) => { thumbRefs.current[i] = el; }}
+                  onClick={() => selectTemplate(i)}
+                  onKeyDown={(e) => onThumbKeyDown(e, i)}
+                >
+                  <span
+                    className="ld-story-card thumb"
+                    dangerouslySetInnerHTML={{ __html: templateInner(song, t.id) }}
+                  />
+                  <span className="ld-thumb-check" aria-hidden="true">✓</span>
+                  <span className="ld-thumb-label">{t.label}</span>
+                </button>
+              );
+            })}
           </div>
-          <div className="ld-modal-actions">
-            <button className="ld-btn-ghost" id="modalCancel" onClick={closeStoryModal}>Cancel</button>
-            <button className="ld-btn-ghost" id="modalDownload" onClick={handleDownload} disabled={shareBusy}>
-              Download
-            </button>
-            <button className="ld-btn-primary" id="modalShare" onClick={handleShare} disabled={shareBusy}>
-              {shareBusy ? "Rendering…" : shareSupported ? "Post to Story" : `Save & open ${currentPlatform}`}
-            </button>
-          </div>
-          <p className={`ld-share-status${shareTone}`} role="status" aria-live="polite">
-            {share.message || (preparing ? "Getting your Story image ready…" : "")}
+          <p className="ld-template-hint">
+            <kbd>←</kbd> <kbd>→</kbd> switch template · <kbd>Esc</kbd> close
           </p>
+          {/* Sticky: Download / Post stay visible while the panel scrolls. */}
+          <div className="ld-modal-foot">
+            <div className="ld-modal-actions">
+              <button className="ld-btn-ghost" id="modalCancel" onClick={closeStoryModal}>Cancel</button>
+              <button className="ld-btn-ghost" id="modalDownload" onClick={handleDownload} disabled={shareBusy}>
+                Download
+              </button>
+              <button className="ld-btn-primary" id="modalShare" onClick={handleShare} disabled={shareBusy}>
+                {shareBusy ? "Rendering…" : shareSupported ? "Post to Story" : `Save & open ${currentPlatform}`}
+              </button>
+            </div>
+            <p className={`ld-share-status${shareTone}`} role="status" aria-live="polite">
+              {share.message || (preparing ? "Getting your Story image ready…" : "")}
+            </p>
+          </div>
         </div>
       </div>
   </>
