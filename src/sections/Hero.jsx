@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, FastForward, Pause, Play, Plus, Rewind, SkipBack, SkipForward } from "lucide-react";
+import { ArrowRight, FastForward, ImagePlus, Pause, Play, Plus, Rewind, SkipBack, SkipForward, X } from "lucide-react";
 import { findMoreSongs, matchImageToTracks } from "../lib/match.js";
 import { spotifySearchUrl } from "../lib/spotify.js";
 import { renderStoryImage } from "../lib/storyImage.js";
@@ -192,6 +192,26 @@ export default function Hero() {
   else if (fetchingMore) statusLabel = "loading more…";
 
   const openFilePicker = () => fileInputRef.current?.click();
+
+  const removePhoto = () => {
+    // Ignore any match/refill request still running for the removed photo.
+    matchIdRef.current += 1;
+    moreRef.current = false;
+    analysisRef.current = null;
+    seenRef.current = new Set();
+    batchRef.current = 0;
+    exhaustedRef.current = false;
+    emptyRef.current = 0;
+    fileInputRef.current.value = "";
+    setUploadedImage(null);
+    setMatches([]);
+    setIdx(0);
+    setStatus("idle");
+    setSwipeDir(null);
+    setWhyOpen(false);
+    setFetchingMore(false);
+    setShare({ phase: "idle", message: "" });
+  };
 
   /**
    * Tops the deck up with tracks it has not shown yet, so "next" never reaches
@@ -685,9 +705,26 @@ export default function Hero() {
                         <img src={uploadedImage} alt="Your uploaded photo" />
                         <span className="ld-tlabel">MATCHED FROM YOUR PHOTO</span>
                       </div>
-                      <button type="button" className="ld-change-photo-btn" onClick={openFilePicker}>
-                        change
-                      </button>
+                      <div className="ld-photo-actions">
+                        <button
+                          type="button"
+                          className="ld-change-photo-btn"
+                          onClick={openFilePicker}
+                          aria-label="Change photo"
+                          title="Change photo"
+                        >
+                          <ImagePlus size={17} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="ld-change-photo-btn ld-remove-photo-btn"
+                          onClick={removePhoto}
+                          aria-label="Remove photo"
+                          title="Remove photo"
+                        >
+                          <X size={17} aria-hidden="true" />
+                        </button>
+                      </div>
                     </>
                   ) : (
                     <>
