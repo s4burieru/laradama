@@ -41,6 +41,7 @@ export const storyTemplates = [
   { id: "meme", label: "Meme" },
   { id: "vinyl", label: "Vinyl" },
   { id: "neon", label: "Neon" },
+  { id: "collage", label: "2x2 Collage" },
 ];
 
 const stats = [
@@ -133,6 +134,15 @@ export function renderStoryTemplate(s, id, uploadedImage = null) {
   }
   if (id === "neon") {
     return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-neon-duotone"></div><div class="ld-story-wm">${logo}laradama</div><div class="ld-neon-eq">${"<span></span>".repeat(7)}</div><div class="ld-neon-title">${s.title}</div><div class="ld-neon-wm-strip">laradama &nbsp;•&nbsp; laradama &nbsp;•&nbsp; laradama</div>`;
+  }
+  if (id === "collage") {
+    const tileStyles = Array.from({ length: 4 }, () => {
+      const bgStyle = uploadedImage
+        ? `background-image:url(${uploadedImage});background-size:cover;background-position:center center;`
+        : `background:${s.gradient};background-size:cover;background-position:center center;`;
+      return `<span class="ld-collage-tile" style="${bgStyle}"></span>`;
+    }).join("");
+    return `<div class="ld-collage-grid">${tileStyles}</div><div class="ld-collage-overlay"></div><div class="ld-story-wm">${logo}laradama</div><div class="ld-collage-caption"><span class="ld-collage-label">${s.title}</span><span class="ld-collage-sub">${s.artist}</span></div>`;
   }
   return "";
 }
