@@ -43,10 +43,10 @@ export default function WhyItMatches() {
             Not just a match — a reason.
           </h2>
           <p className="mb-5.5 text-base leading-[1.65] text-laradama-dim">
-            Every pick comes with a plain-language explanation: what Laradama saw in your image, and
-            what it heard in the track that made the pairing click. It&apos;s a second layer once you
-            keep a song — read the mood behind the mix, or learn something new about the track
-            itself.
+            Every song comes with a simple explanation of why it matches your photo. Laradama looks
+            at the colors, mood, and overall vibe of your image to find a song that fits. Once you
+            find a track you like, you can discover what makes the match work, explore the mood
+            behind the music, and learn more about the song itself.
           </p>
 
           <div className="flex flex-wrap gap-2.5">
