@@ -1,6 +1,6 @@
 /**
- * Story image export — draws the four story templates (clean / meme / vinyl /
- * neon) to a 1080x1920 PNG with Canvas2D.
+ * Story image export — draws the story templates (clean / meme / vinyl /
+ * neon / collage) to a 1080x1920 PNG with Canvas2D.
  *
  * The layout mirrors the `.ld-story-*` rules in src/index.css: those px values
  * are authored against the modal's big preview (`.ld-story-card.ld-big`, 150px
@@ -565,11 +565,84 @@ function paintNeon(ctx, w, h, s, song, photo, logo) {
   });
 }
 
+function paintCollage(ctx, w, h, s, song, photo, logo) {
+  const pad = 10 * s;
+  const gap = 2 * s;
+  const cols = 2;
+  const rows = 2;
+  const tileW = (w - pad * 2 - gap * (cols - 1)) / cols;
+  const tileH = (h - pad * 2 - 86 * s - gap * (rows - 1)) / rows;
+
+  ctx.fillStyle = '#0d0d0d';
+  ctx.fillRect(0, 0, w, h);
+
+  for (let i = 0; i < cols * rows; i += 1) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = pad + col * (tileW + gap);
+    const y = pad + row * (tileH + gap);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, tileW, tileH);
+    ctx.clip();
+    if (photo) {
+      drawCover(ctx, photo, x, y, tileW, tileH);
+    } else {
+      ctx.fillStyle = cssLinearGradient(ctx, song?.gradient, x, y, tileW, tileH) || '#191919';
+      ctx.fillRect(x, y, tileW, tileH);
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1 * s;
+    ctx.strokeRect(x + 0.5 * s, y + 0.5 * s, tileW - 1 * s, tileH - 1 * s);
+    ctx.restore();
+  }
+
+  const scrim = ctx.createLinearGradient(0, 0, 0, h);
+  scrim.addColorStop(0, 'rgba(0,0,0,0.08)');
+  scrim.addColorStop(0.75, 'rgba(0,0,0,0.18)');
+  scrim.addColorStop(1, 'rgba(0,0,0,0.68)');
+  ctx.fillStyle = scrim;
+  ctx.fillRect(0, 0, w, h);
+
+  drawWatermark(ctx, { edge: 8 * s, y: 8 * s, align: 'left', label: 'laradama', s, logo });
+
+  const barH = 64 * s;
+  const barY = h - barH;
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(0, barY, w, barH);
+
+  drawText(ctx, song.title, {
+    x: w / 2,
+    y: barY + 18 * s,
+    baseline: 'top',
+    align: 'center',
+    size: 12 * s,
+    weight: 700,
+    maxWidth: w - 26 * s,
+    letterSpacing: '0.02em',
+  });
+  drawText(ctx, song.artist?.toUpperCase?.() || song.artist || 'laradama', {
+    x: w / 2,
+    y: barY + 32 * s,
+    baseline: 'top',
+    align: 'center',
+    size: 7 * s,
+    weight: 600,
+    color: 'rgba(255,255,255,0.8)',
+    maxWidth: w - 34 * s,
+    letterSpacing: '0.12em',
+  });
+}
+
 const PAINTERS = {
   clean: paintClean,
   meme: paintMeme,
   vinyl: paintVinyl,
   neon: paintNeon,
+  collage: paintCollage,
 };
 
 /* ------------------------------------------------------------------ public */
