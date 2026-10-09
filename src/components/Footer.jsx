@@ -62,7 +62,7 @@ export default function Footer() {
           <ul className="mt-24 grid list-none gap-2.5 p-0 text-[14px] text-[#8e8e8e]">
             <li className="flex items-center gap-2.5"><MapPin className="h-4 w-4 stroke-[2.5]" /> Rizal, Philippines</li>
             <li className="flex items-center gap-2.5"><Phone className="h-4 w-4 stroke-[2.5]" /> +63 (950) 245-8088</li>
-            <li className="flex items-center gap-2.5"><Mail className="h-4 w-4 stroke-[2.5]" /> savvv.business@gmail.com</li>
+            <li className="flex items-center gap-2.5"><Mail className="h-4 w-4 stroke-[2.5]" /> laradama.app@gmail.com</li>
           </ul>
         </section>
 
