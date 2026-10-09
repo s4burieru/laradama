@@ -31,7 +31,7 @@ const legalContent = {
       {
         title: "Service providers and links",
         paragraphs: [
-          "Some features may rely on third-party providers, such as hosting, image analysis, or music services. Information needed to provide a feature may be handled by those providers under their own privacy policies and terms. Music previews and links may take you to third-party services; their practices are not controlled by Laradama.",
+          "Some features may rely on third-party providers, such as hosting, image analysis, or music services. Contact form submissions are sent to FormSubmit to deliver messages to us; the name, email address, category, and message you submit are handled by that provider under its own privacy policy and terms. Information needed to provide a feature may be handled by those providers under their own privacy policies and terms. Music previews and links may take you to third-party services; their practices are not controlled by Laradama.",
         ],
       },
       {
