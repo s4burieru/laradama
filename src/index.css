@@ -270,7 +270,9 @@
 .ld-collage-label { font-family: var(--font-display); font-weight: 700; color: #fff; font-size: calc(11 * var(--ld-u)); line-height: 1.1; }
 .ld-collage-sub { color: rgba(255, 255, 255, 0.8); font-size: calc(7.5 * var(--ld-u)); letter-spacing: 0.08em; text-transform: uppercase; }
 
-.ld-template-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.ld-template-picker { display: flex; align-items: center; gap: 6px; }
+.ld-template-grid { display: flex; flex: 1; min-width: 0; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-behavior: smooth; scrollbar-width: none; padding: 4px 2px; }
+.ld-template-grid::-webkit-scrollbar { display: none; }
 .ld-thumb-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 /* Same idea on the tiles: the selection ring is an inset shadow, so a thumb's
    inner design scales purely with its width (no 2px border tax). */
@@ -283,10 +285,19 @@
    instead of only a colour. The 4px pad is paid back with margin: -4px, so the
    card itself keeps exactly the width the grid track gives it. */
 .ld-thumb-btn { position: relative; padding: 4px; margin: -4px; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; border-radius: 4px; transition: background-color 0.15s, transform 0.15s; }
+.ld-template-grid .ld-thumb-btn { flex: 0 0 calc((100% - 20px) / 3); min-width: 0; }
 .ld-thumb-btn:hover { background: rgba(255, 255, 255, 0.06); transform: translateY(-2px); }
 .ld-thumb-btn:focus-visible { outline: 2px solid var(--color-laradama-brand); outline-offset: 3px; }
 .ld-thumb-check { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--color-laradama-brand); color: #06170c; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(0.6); transition: opacity 0.15s, transform 0.15s; pointer-events: none; }
 .ld-thumb-btn.selected .ld-thumb-check { opacity: 1; transform: scale(1); }
+.ld-template-scroll { flex: 0 0 28px; width: 28px; height: 36px; display: flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--color-laradama-line); background: var(--color-laradama-card); color: var(--color-laradama-ink); cursor: pointer; }
+.ld-template-scroll:hover { border-color: var(--color-laradama-brand); color: var(--color-laradama-brand); }
+.ld-template-scroll:focus-visible { outline: 2px solid var(--color-laradama-brand); outline-offset: 2px; }
+.ld-template-scroll svg { width: 18px; height: 18px; }
+.ld-feature-template-picker { display: flex; align-items: center; gap: 10px; }
+.ld-feature-template-track { display: flex; flex: 1; min-width: 0; gap: 16px; overflow-x: auto; overscroll-behavior-x: contain; scroll-behavior: smooth; scrollbar-width: none; padding: 4px 2px 8px; }
+.ld-feature-template-track::-webkit-scrollbar { display: none; }
+.ld-feature-template-item { flex: 0 0 calc((100% - 48px) / 4); min-width: 0; }
 
 .ld-template-hint { margin-top: 12px; text-align: center; font-family: var(--font-mono); font-size: 10.5px; color: var(--color-laradama-dimmer); }
 .ld-template-hint kbd { font-family: inherit; color: var(--color-laradama-dim); }
@@ -295,7 +306,10 @@
    that width the tiles are already nearly preview-sized, so the 150px card
    above them is a duplicate that pushes row two under the sticky footer. */
 @media (max-width: 420px) {
-  .ld-template-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .ld-template-grid { gap: 8px; }
+  .ld-template-grid .ld-thumb-btn { flex-basis: calc((100% - 8px) / 2); }
+  .ld-template-picker { gap: 4px; }
+  .ld-template-scroll { flex-basis: 24px; width: 24px; }
   .ld-story-card.ld-big { display: none; }
   /* three lines that push the second row under the footer; the Share button
      already says where the story goes. Same for the keyboard hint — there are
@@ -303,6 +317,12 @@
      without scrolling. */
   .ld-modal-head p { display: none; }
   .ld-template-hint { display: none; }
+}
+@media (max-width: 640px) {
+  .ld-feature-template-picker { gap: 4px; }
+  .ld-feature-template-track { gap: 10px; }
+  .ld-feature-template-item { flex-basis: calc((100% - 10px) / 2); }
+  .ld-feature-template-picker .ld-template-scroll { flex-basis: 24px; width: 24px; }
 }
 /* Actions + status pin to the bottom of the panel while it scrolls, so
    Download / Post stay reachable on a short phone screen. */
