@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, FastForward, ImagePlus, Pause, Play, Plus, Rewind, SkipBack, SkipForward, X } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, FastForward, ImagePlus, Pause, Play, Plus, Rewind, SkipBack, SkipForward, X } from "lucide-react";
 import { findMoreSongs, matchImageToTracks } from "../lib/match.js";
 import { spotifySearchUrl } from "../lib/spotify.js";
 import { renderStoryImage } from "../lib/storyImage.js";
@@ -449,6 +449,14 @@ export default function Hero() {
   const modalPanelRef = useRef(null);
   const thumbRefs = useRef([]);
   const modalOpenerRef = useRef(null);
+  const templateScrollerRef = useRef(null);
+
+  const scrollTemplates = (direction) => {
+    const scroller = templateScrollerRef.current;
+    if (scroller) {
+      scroller.scrollBy({ left: direction * scroller.clientWidth * 0.8, behavior: "smooth" });
+    }
+  };
 
   /** Select a template by its index in `storyTemplates` (0-based). */
   const selectTemplate = (i) => {
@@ -942,30 +950,54 @@ export default function Hero() {
             dangerouslySetInnerHTML={{ __html: templateInner(song, currentTemplate) }}
           />
           {/* Radiogroup + roving tabindex: one Tab stop, ←/→ to browse. */}
-          <div className="ld-template-grid" id="templateGrid" role="radiogroup" aria-label="Story templates">
-            {storyTemplates.map((t, i) => {
-              const selected = currentTemplate === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  tabIndex={selected ? 0 : -1}
-                  className={`ld-thumb-wrap ld-thumb-btn${selected ? " selected" : ""}`}
-                  ref={(el) => { thumbRefs.current[i] = el; }}
-                  onClick={() => selectTemplate(i)}
-                  onKeyDown={(e) => onThumbKeyDown(e, i)}
-                >
-                  <span
-                    className="ld-story-card thumb"
-                    dangerouslySetInnerHTML={{ __html: templateInner(song, t.id) }}
-                  />
-                  <span className="ld-thumb-check" aria-hidden="true">✓</span>
-                  <span className="ld-thumb-label">{t.label}</span>
-                </button>
-              );
-            })}
+          <div className="ld-template-picker">
+            <button
+              className="ld-template-scroll"
+              type="button"
+              aria-label="Scroll to previous templates"
+              onClick={() => scrollTemplates(-1)}
+            >
+              <ChevronLeft aria-hidden="true" />
+            </button>
+            <div
+              className="ld-template-grid"
+              id="templateGrid"
+              role="radiogroup"
+              aria-label="Story templates"
+              ref={templateScrollerRef}
+            >
+              {storyTemplates.map((t, i) => {
+                const selected = currentTemplate === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    tabIndex={selected ? 0 : -1}
+                    className={`ld-thumb-wrap ld-thumb-btn${selected ? " selected" : ""}`}
+                    ref={(el) => { thumbRefs.current[i] = el; }}
+                    onClick={() => selectTemplate(i)}
+                    onKeyDown={(e) => onThumbKeyDown(e, i)}
+                  >
+                    <span
+                      className="ld-story-card thumb"
+                      dangerouslySetInnerHTML={{ __html: templateInner(song, t.id) }}
+                    />
+                    <span className="ld-thumb-check" aria-hidden="true">✓</span>
+                    <span className="ld-thumb-label">{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              className="ld-template-scroll"
+              type="button"
+              aria-label="Scroll to next templates"
+              onClick={() => scrollTemplates(1)}
+            >
+              <ChevronRight aria-hidden="true" />
+            </button>
           </div>
           <p className="ld-template-hint">
             <kbd>←</kbd> <kbd>→</kbd> switch template · <kbd>Esc</kbd> close

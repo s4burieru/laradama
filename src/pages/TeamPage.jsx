@@ -139,7 +139,9 @@ export default function TeamPage() {
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <a
                 className="inline-flex items-center gap-2 border border-laradama-brand px-5 py-3 text-sm font-semibold text-laradama-brand transition hover:bg-laradama-brand/10"
-                href="/contact"
+                href="https://docs.google.com/forms/d/e/1FAIpQLSfm8nflCuzbT6JmUdFnMQ7xcPt9hjt9vL1517YIHyXQvk3J_Q/viewform?usp=dialog"
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 Apply Now <span aria-hidden="true">→</span>
               </a>

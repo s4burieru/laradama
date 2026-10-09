@@ -1,4 +1,7 @@
+import { useRef } from "react";
 import {
+  ChevronLeft,
+  ChevronRight,
   Headphones,
   ImagePlus,
   Lightbulb,
@@ -22,6 +25,14 @@ const features = [
 ];
 
 export default function FeaturesPage() {
+  const templateScrollerRef = useRef(null);
+  const scrollTemplates = (direction) => {
+    const scroller = templateScrollerRef.current;
+    if (scroller) {
+      scroller.scrollBy({ left: direction * scroller.clientWidth * 0.8, behavior: "smooth" });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#121212] font-sans text-white">
       <Navbar />
@@ -56,13 +67,31 @@ export default function FeaturesPage() {
         <section className="w-full">
           <div className="mx-auto max-w-375 px-6 py-14 md:px-8 md:py-16 max-[640px]:px-6">
             <div className="text-center"><h2 className="font-display text-4xl font-bold text-white">Share to Story <span className="text-laradama-brand">Templates</span></h2><p className="mx-auto mt-4 max-w-175 text-base leading-[1.55] text-[#858585] sm:text-lg">Pick from beautifully designed template frames to instantly export your photo and song match as an aesthetic masterpiece.</p></div>
-            <div className="mx-auto mt-9 grid max-w-260 grid-cols-4 gap-4 sm:gap-5 max-[520px]:grid-cols-2">
+            <div className="ld-feature-template-picker mx-auto mt-9 max-w-260">
+              <button
+                className="ld-template-scroll"
+                type="button"
+                aria-label="Scroll to previous templates"
+                onClick={() => scrollTemplates(-1)}
+              >
+                <ChevronLeft aria-hidden="true" />
+              </button>
+              <div className="ld-feature-template-track" ref={templateScrollerRef}>
               {storyTemplates.map((template) => (
-                <article key={template.id} className="ld-thumb-wrap">
+                <article key={template.id} className="ld-thumb-wrap ld-feature-template-item">
                   <div className="ld-story-card thumb" dangerouslySetInnerHTML={{ __html: renderStoryTemplate(songs[0], template.id) }} />
                   <span className="ld-thumb-label text-xs! font-normal uppercase sm:text-sm!">{template.label}</span>
                 </article>
               ))}
+              </div>
+              <button
+                className="ld-template-scroll"
+                type="button"
+                aria-label="Scroll to next templates"
+                onClick={() => scrollTemplates(1)}
+              >
+                <ChevronRight aria-hidden="true" />
+              </button>
             </div>
           </div>
         </section>
