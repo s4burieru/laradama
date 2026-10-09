@@ -621,9 +621,8 @@ export default function Hero() {
             has a <span className="text-laradama-brand">soundtrack.</span>
           </h1>
           <p className="mt-6 max-w-120 text-lg leading-relaxed text-laradama-dim">
-            Upload or capture a photo. Laradama App reads its mood, color, and
-            motion, then matches it to a trending song — instantly. Don't like
-            the pick? Swipe for another.
+           Upload or take a photo. Laradama App analyzes its mood, colors, and movement to find a trending song that fits the vibe. 
+           Not your type of song? Simply swipe to discover another match.
           </p>
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
             <button
@@ -656,9 +655,6 @@ export default function Hero() {
             onPlaying={() => setBuffering(false)}
             onCanPlay={() => { setBuffering(false); startIfWanted(); }}
           />
-          <p className="mt-3 font-mono text-xs tracking-[0.02em] text-laradama-dimmer">
-            Try it — pick any photo, your match updates live in the demo →
-          </p>
           <div className="mt-10 grid grid-cols-3 gap-x-4 gap-y-6 sm:gap-x-7">
             {stats.map((s) => (
               <div key={s.label} className="flex flex-col gap-0.5">

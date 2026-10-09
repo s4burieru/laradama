@@ -2,7 +2,7 @@ const steps = [
   {
     n: "01 — CAPTURE",
     title: "Upload or snap a photo",
-    desc: "Drop in an existing image or use your camera. Any scene works — portraits, landscapes, food, a screenshot of your mood board.",
+    desc: "Choose a photo from your gallery or take a new one. It can be a selfie, a view, food, or anything you want to share.",
   },
   {
     n: "02 — ANALYZE",
@@ -12,7 +12,7 @@ const steps = [
   {
     n: "03 — MATCH",
     title: "Get a trending track",
-    desc: "It's paired against songs trending right now — not a static library — so the match always feels current.",
+    desc: "Laradama finds a trending song that matches your photo’s vibe, making every recommendation feel fresh and up to date.",
   },
   {
     n: "04 — REFINE",
