@@ -79,8 +79,9 @@ export default function HowToUsePage() {
               <span className="text-laradama-brand">feeling in music.</span>
             </h1>
             <p className="mt-5 max-w-165 text-base leading-[1.7] text-[#999] sm:text-lg">
-              Bring a moment to Laradama and discover music inspired by its
-              mood. Here’s how to get started.
+              Upload or take a photo. Laradama App checks its mood, colors, and
+              movement to find a trending song that matches its vibe. Don&apos;t
+              like the song? Just swipe to find another one you might like.
             </p>
             <a
               href="#steps"
