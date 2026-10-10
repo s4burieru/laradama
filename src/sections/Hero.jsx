@@ -3,7 +3,17 @@ import { ArrowRight, ChevronLeft, ChevronRight, FastForward, ImagePlus, Pause, P
 import { findMoreSongs, matchImageToTracks } from "../lib/match.js";
 import { spotifySearchUrl } from "../lib/spotify.js";
 import { renderStoryImage } from "../lib/storyImage.js";
-import { canShareFiles, downloadStoryFile, shareStoryFile } from "../lib/storyShare.js";
+import { canShareFiles, downloadStoryFile, saveAndOpenStoryFile, shareStoryFile } from "../lib/storyShare.js";
+import { storyTemplates } from "../data/storyTemplates";
+import StoryPreview from "../components/StoryPreview";
+
+export { storyTemplates };
+
+/**
+ * The video encoder (and its Mediabunny muxer) only matters once the story
+ * modal is in play, so it rides in on demand — off the initial page bundle.
+ */
+const storyVideoModule = () => import("../lib/storyVideo.js");
 
 export const songs = [
   {
@@ -34,14 +44,6 @@ export const songs = [
     gradient: "linear-gradient(135deg,#3A3A3E,#1ED760)",
     why: "Sharp shadows and motion blur in your photo read as urban and kinetic. This track's punchy bassline and upbeat tempo match that energy — one of this week's fastest-climbing tracks.",
   },
-];
-
-export const storyTemplates = [
-  { id: "clean", label: "Clean" },
-  { id: "meme", label: "Meme" },
-  { id: "vinyl", label: "Vinyl" },
-  { id: "neon", label: "Neon" },
-  { id: "collage", label: "2x2 Collage" },
 ];
 
 const stats = [
@@ -116,37 +118,6 @@ const effectiveDuration = (el) => {
 /** Dedupe key for a deck entry — must match the music layer's candidate keys. */
 const trackKey = (s) => `${String(s?.title || "").toLowerCase()}::${String(s?.artist || "").toLowerCase()}`;
 
-export function renderStoryTemplate(s, id, uploadedImage = null) {
-  const bg = uploadedImage
-    ? `background-image:url(${uploadedImage})`
-    : `background:${s.gradient}`;
-  // Brand mark shared by every template — the same file storyImage.js paints
-  // into the exported PNG, so preview and export stay identical.
-  const logo = `<img class="ld-story-logo" src="/laradama-logo.png" alt="">`;
-  if (id === "clean") {
-    return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-story-scrim-b"></div><div class="ld-story-wm">${logo}laradama</div><div class="ld-story-info"><div class="ld-story-title">${s.title}</div><div class="ld-story-artist">${s.artist} · trending now</div></div>`;
-  }
-  if (id === "meme") {
-    return `<div class="ld-story-bg contain" style="${bg}"></div><div class="ld-meme-bar top">${logo}my photo's soundtrack is</div><div class="ld-meme-bar bottom">${s.title}</div>`;
-  }
-  if (id === "vinyl") {
-    return `<div class="ld-story-bg blurbg" style="${bg}"></div><div class="ld-vinyl-disc"><div class="ld-vinyl-photo" style="${bg}"></div><div class="ld-vinyl-grooves"></div><div class="ld-vinyl-hole"></div></div><div class="ld-vinyl-caption">${s.title} — ${s.artist}</div><div class="ld-story-wm corner">${logo}laradama</div>`;
-  }
-  if (id === "neon") {
-    return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-neon-duotone"></div><div class="ld-story-wm">${logo}laradama</div><div class="ld-neon-eq">${"<span></span>".repeat(7)}</div><div class="ld-neon-title">${s.title}</div><div class="ld-neon-wm-strip">laradama &nbsp;•&nbsp; laradama &nbsp;•&nbsp; laradama</div>`;
-  }
-  if (id === "collage") {
-    const tileStyles = Array.from({ length: 4 }, () => {
-      const bgStyle = uploadedImage
-        ? `background-image:url(${uploadedImage});background-size:cover;background-position:center center;`
-        : `background:${s.gradient};background-size:cover;background-position:center center;`;
-      return `<span class="ld-collage-tile" style="${bgStyle}"></span>`;
-    }).join("");
-    return `<div class="ld-collage-grid">${tileStyles}</div><div class="ld-collage-overlay"></div><div class="ld-story-wm">${logo}laradama</div><div class="ld-collage-caption"><span class="ld-collage-label">${s.title}</span><span class="ld-collage-sub">${s.artist}</span></div>`;
-  }
-  return "";
-}
-
 export default function Hero() {
   const fileInputRef = useRef(null);
   const demoRef = useRef(null);
@@ -161,6 +132,9 @@ export default function Hero() {
   // Share/export outcome shown under the modal's buttons. `working` is the only
   // busy phase — everything else is a terminal message the user can read.
   const [share, setShare] = useState({ phase: "idle", message: "" });
+  // Whether this browser can encode the animated MP4 (probed once on mount;
+  // false → "Post to Story" keeps the PNG flow it always had).
+  const [videoSupported, setVideoSupported] = useState(false);
   const [matches, setMatches] = useState([]);
   const [status, setStatus] = useState("idle"); // idle | analyzing | ready
   const [progress, setProgress] = useState({ current: 0, duration: 0 });
@@ -442,21 +416,22 @@ export default function Hero() {
     demoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const templateInner = (s, id) => renderStoryTemplate(s, id, uploadedImage);
-
-  // Everything the story modal needs: the panel to keep Tab inside, the four
-  // tiles for the arrow-key cursor, and whatever opened it so focus can go back.
+  // Everything the story modal needs: the panel to keep Tab inside, the dots
+  // the open animation lands focus on, and whatever opened it so focus can go
+  // back. The template picker is a carousel around the big preview now — the
+  // ‹ › buttons and the dots below it — so there is no thumbnail strip to
+  // scroll or keep a cursor on.
   const modalPanelRef = useRef(null);
-  const thumbRefs = useRef([]);
+  const dotRefs = useRef([]);
   const modalOpenerRef = useRef(null);
-  const templateScrollerRef = useRef(null);
 
-  const scrollTemplates = (direction) => {
-    const scroller = templateScrollerRef.current;
-    if (scroller) {
-      scroller.scrollBy({ left: direction * scroller.clientWidth * 0.8, behavior: "smooth" });
-    }
-  };
+  // Mirror of `currentTemplate` for the keyboard/swipe handlers below: reading
+  // state directly there is fine, but the open effect must not re-subscribe on
+  // every template change (that would steal focus from the arrows mid-browse).
+  const currentTemplateRef = useRef(currentTemplate);
+  useEffect(() => {
+    currentTemplateRef.current = currentTemplate;
+  }, [currentTemplate]);
 
   /** Select a template by its index in `storyTemplates` (0-based). */
   const selectTemplate = (i) => {
@@ -467,18 +442,53 @@ export default function Hero() {
     setShare({ phase: "idle", message: "" });
   };
 
-  /** ←/→ (and ↑/↓) walk the picker, wrapping at both ends, and take focus. */
-  const onThumbKeyDown = (e, i) => {
-    const steps = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+  /** ←/→ (and ↑/↓) step the carousel, wrapping at both ends. */
+  const stepTemplate = (dir) => {
     const n = storyTemplates.length;
-    let next = null;
-    if (e.key in steps) next = (i + steps[e.key] + n) % n;
-    else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = n - 1;
-    if (next === null) return;
-    e.preventDefault();
-    selectTemplate(next);
-    thumbRefs.current[next]?.focus();
+    const at = storyTemplates.findIndex((t) => t.id === currentTemplateRef.current);
+    selectTemplate(((at < 0 ? 0 : at) + dir + n) % n);
+  };
+
+  // Where the carousel is sitting — drives the "Clean · 2 / 5" line under the
+  // preview. -1 (unknown id) reads as the first template.
+  const currentTemplateIndex = Math.max(
+    0,
+    storyTemplates.findIndex((t) => t.id === currentTemplate),
+  );
+  const currentTemplateLabel = storyTemplates[currentTemplateIndex]?.label ?? "";
+
+  // Touch swipe across the preview cycles templates the same way — the stage
+  // is the picker on phones, where the ‹ › targets are easy to miss.
+  const stageTouchX = useRef(null);
+  const onStageTouchStart = (e) => {
+    stageTouchX.current = e.touches[0].clientX;
+  };
+  const onStageTouchEnd = (e) => {
+    const startX = stageTouchX.current;
+    stageTouchX.current = null;
+    if (startX == null) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) stepTemplate(dx < 0 ? 1 : -1);
+  };
+
+  /**
+   * One keydown handler for the whole dialog: Tab stays trapped inside it, and
+   * ←/→ (and ↑/↓, Home, End) step the template carousel wherever focus is.
+   */
+  const onPanelKeyDown = (e) => {
+    trapFocus(e);
+    const steps = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+    if (e.key in steps) {
+      e.preventDefault();
+      stepTemplate(steps[e.key]);
+      return;
+    }
+    if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      const i = e.key === "Home" ? 0 : storyTemplates.length - 1;
+      selectTemplate(i);
+      dotRefs.current[i]?.focus();
+    }
   };
 
   /** Keep Tab inside the dialog — the page behind it is still focusable. */
@@ -505,8 +515,9 @@ export default function Hero() {
   };
 
   // Escape closes the story modal (the ✕ and the overlay already do), and the
-  // moment it opens focus lands on the selected tile, so ←/→ start browsing
-  // without a Tab hunt first.
+  // moment it opens focus lands on the selected dot, so ←/→ start browsing
+  // without a Tab hunt first. Deliberately not re-run when the template
+  // changes — cycling must never yank focus off the ‹ › buttons.
   useEffect(() => {
     if (!modalOpen) return undefined;
     const onKey = (e) => {
@@ -514,14 +525,14 @@ export default function Hero() {
     };
     window.addEventListener("keydown", onKey);
     const raf = requestAnimationFrame(() => {
-      const i = storyTemplates.findIndex((t) => t.id === currentTemplate);
-      thumbRefs.current[i < 0 ? 0 : i]?.focus();
+      const i = storyTemplates.findIndex((t) => t.id === currentTemplateRef.current);
+      dotRefs.current[i < 0 ? 0 : i]?.focus();
     });
     return () => {
       window.removeEventListener("keydown", onKey);
       cancelAnimationFrame(raf);
     };
-  }, [modalOpen, currentTemplate]);
+  }, [modalOpen]);
 
   // ...and when it closes, focus goes back to the button that opened it, so
   // the next Tab doesn't start over at the top of the page. Runs for every
@@ -593,13 +604,36 @@ export default function Hero() {
     return cached && cached.key === storyKey ? cached.blob : startStoryRender();
   };
 
-  // Pre-render while the modal shows a template (and whenever it changes).
+  // Probe video-export support once — the answer only changes with the browser.
+  useEffect(() => {
+    let alive = true;
+    storyVideoModule()
+      .then((m) => m.canExportVideo())
+      .then((ok) => {
+        if (alive) setVideoSupported(Boolean(ok));
+      })
+      .catch(() => {
+        if (alive) setVideoSupported(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Pre-render while the modal shows a template (and whenever it changes), and
+  // warm the decoded audio the video export bakes in — fetching + decoding the
+  // preview takes seconds that would otherwise sit inside the Post click.
   useEffect(() => {
     if (!modalOpen) return undefined;
     storyBlob();
+    if (videoSupported && song?.audioUrl) {
+      storyVideoModule()
+        .then((m) => m.prewarmStoryAudio(song.audioUrl))
+        .catch(() => {});
+    }
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modalOpen, storyKey]);
+  }, [modalOpen, storyKey, videoSupported]);
 
   /** Reuse the pre-rendered PNG when it matches; render on demand otherwise. */
   const renderStory = async () => {
@@ -607,22 +641,63 @@ export default function Hero() {
     return storyBlob();
   };
 
-  const exportFailed = (err) => {
-    console.warn("[story] could not export the Story image:", err);
-    setShare({ phase: "error", message: "Couldn't render the Story image — try another template." });
+  const exportFailed = (err, kind = "image") => {
+    console.warn(`[story] could not export the Story ${kind}:`, err);
+    setShare({
+      phase: "error",
+      message:
+        kind === "video"
+          ? "Couldn't render the Story video — try Download image or another template."
+          : "Couldn't render the Story image — try another template.",
+    });
   };
+
+  /** Render the story video with the progress line the modal shows. */
+  const renderVideoWithProgress = async () => {
+    const silent = !song?.audioUrl;
+    const label = (p) =>
+      `${silent ? "No preview for this track — rendering your story without music" : "Rendering your story video"}…${p < 1 ? ` ${Math.round(p * 100)}%` : ""}`;
+    setShare({ phase: "working", message: label(0) });
+    const { renderStoryVideo } = await storyVideoModule();
+    return renderStoryVideo({
+      song,
+      templateId: currentTemplate,
+      uploadedImage,
+      onProgress: (p) => setShare({ phase: "working", message: label(p) }),
+    });
+  };
+
+  /** What "Post to Story" shares: the video when the browser can encode one. */
+  const renderForShare = async () => (videoSupported ? renderVideoWithProgress() : renderStory());
 
   const handleShare = async () => {
     if (shareBusy) return;
     try {
-      const blob = await renderStory();
-      const res = await shareStoryFile(blob, { platform: currentPlatform, song });
+      const blob = await renderForShare();
+      if (shareSupported) {
+        // Sheet-only: the file goes from memory to the OS share sheet and
+        // never touches Downloads. A sheet that won't open says so — it does
+        // not save a file the user never asked for.
+        const res = await shareStoryFile(blob, { platform: currentPlatform, song });
+        if (res.phase === "failed") {
+          setShare({
+            phase: "error",
+            message: `Couldn't open the ${currentPlatform} share sheet — use ${videoSupported ? "Download video" : "Download image"} instead.`,
+          });
+          return;
+        }
+        setShare({ phase: res.phase, message: res.message });
+        // Only a real share closes the modal — cancelled/failed stay open so
+        // the message (and the Download buttons) are actionable.
+        if (res.phase === "shared") closeStoryModal();
+        return;
+      }
+      // No share sheet (desktop / older browsers): the label says "Save …",
+      // so saving first and opening the platform is exactly what was promised.
+      const res = await saveAndOpenStoryFile(blob, { platform: currentPlatform });
       setShare({ phase: res.phase, message: res.message });
-      // Only a real share closes the modal — on the save-and-open path it stays
-      // up so the "open Instagram and pick this file" instructions are readable.
-      if (res.phase === "shared") closeStoryModal();
     } catch (err) {
-      exportFailed(err);
+      exportFailed(err, videoSupported ? "video" : "image");
     }
   };
 
@@ -634,6 +709,17 @@ export default function Hero() {
       setShare({ phase: res.phase, message: res.message });
     } catch (err) {
       exportFailed(err);
+    }
+  };
+
+  const handleDownloadVideo = async () => {
+    if (shareBusy || !videoSupported) return;
+    try {
+      const blob = await renderVideoWithProgress();
+      const res = await downloadStoryFile(blob, { platform: currentPlatform });
+      setShare({ phase: res.phase, message: res.message });
+    } catch (err) {
+      exportFailed(err, "video");
     }
   };
 
@@ -920,7 +1006,7 @@ export default function Hero() {
         </div>
       </div>
     </section>
-{/* ===== STORY TEMPLATE MODAL (clean / meme / vinyl / neon) ===== */}
+{/* ===== STORY TEMPLATE MODAL — carousel picker (stage + dots) ===== */}
       <div
         className={`ld-modal-overlay ${modalOpen ? "open" : ""}`}
         id="storyModal"
@@ -932,7 +1018,7 @@ export default function Hero() {
           aria-modal="true"
           aria-labelledby="storyModalTitle"
           ref={modalPanelRef}
-          onKeyDown={trapFocus}
+          onKeyDown={onPanelKeyDown}
         >
           <div className="ld-modal-head">
             <div>
@@ -944,73 +1030,76 @@ export default function Hero() {
             </div>
             <button className="ld-modal-close" id="modalClose" aria-label="Close" onClick={closeStoryModal}>✕</button>
           </div>
+          {/* The stage is the picker: the preview with ‹ › controls on its
+              edges (and swipe on touch) cycles the templates in place. `key`
+              remounts the card on every change so the template's entrance
+              animation replays — a fresh fade-in wherever you land. */}
           <div
-            className="ld-story-card ld-big"
-            id="bigPreview"
-            dangerouslySetInnerHTML={{ __html: templateInner(song, currentTemplate) }}
-          />
-          {/* Radiogroup + roving tabindex: one Tab stop, ←/→ to browse. */}
-          <div className="ld-template-picker">
-            <button
-              className="ld-template-scroll"
-              type="button"
-              aria-label="Scroll to previous templates"
-              onClick={() => scrollTemplates(-1)}
-            >
+            className="ld-stage"
+            onTouchStart={onStageTouchStart}
+            onTouchEnd={onStageTouchEnd}
+          >
+            <StoryPreview
+              key={currentTemplate}
+              id="bigPreview"
+              className="ld-big"
+              song={song}
+              templateId={currentTemplate}
+              uploadedImage={uploadedImage}
+              animated
+            />
+            <button className="ld-stage-nav prev" type="button" aria-label="Previous template" onClick={() => stepTemplate(-1)}>
               <ChevronLeft aria-hidden="true" />
             </button>
-            <div
-              className="ld-template-grid"
-              id="templateGrid"
-              role="radiogroup"
-              aria-label="Story templates"
-              ref={templateScrollerRef}
-            >
+            <button className="ld-stage-nav next" type="button" aria-label="Next template" onClick={() => stepTemplate(1)}>
+              <ChevronRight aria-hidden="true" />
+            </button>
+          </div>
+          {/* One glance shows which style is showing and how many there are;
+              the dots jump straight to any template. */}
+          <div className="ld-template-meta">
+            <span className="ld-template-name" aria-live="polite">
+              {currentTemplateLabel} <span className="ld-template-count">{`${currentTemplateIndex + 1} / ${storyTemplates.length}`}</span>
+            </span>
+            <div className="ld-dots" role="group" aria-label="Story templates">
               {storyTemplates.map((t, i) => {
                 const selected = currentTemplate === t.id;
                 return (
                   <button
                     key={t.id}
                     type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    tabIndex={selected ? 0 : -1}
-                    className={`ld-thumb-wrap ld-thumb-btn${selected ? " selected" : ""}`}
-                    ref={(el) => { thumbRefs.current[i] = el; }}
+                    className={`ld-dot${selected ? " on" : ""}`}
+                    aria-label={t.label}
+                    aria-pressed={selected}
+                    ref={(el) => { dotRefs.current[i] = el; }}
                     onClick={() => selectTemplate(i)}
-                    onKeyDown={(e) => onThumbKeyDown(e, i)}
-                  >
-                    <span
-                      className="ld-story-card thumb"
-                      dangerouslySetInnerHTML={{ __html: templateInner(song, t.id) }}
-                    />
-                    <span className="ld-thumb-check" aria-hidden="true">✓</span>
-                    <span className="ld-thumb-label">{t.label}</span>
-                  </button>
+                  />
                 );
               })}
             </div>
-            <button
-              className="ld-template-scroll"
-              type="button"
-              aria-label="Scroll to next templates"
-              onClick={() => scrollTemplates(1)}
-            >
-              <ChevronRight aria-hidden="true" />
-            </button>
           </div>
-          <p className="ld-template-hint">
-            <kbd>←</kbd> <kbd>→</kbd> switch template · <kbd>Esc</kbd> close
-          </p>
           {/* Sticky: Download / Post stay visible while the panel scrolls. */}
           <div className="ld-modal-foot">
             <div className="ld-modal-actions">
-              <button className="ld-btn-ghost" id="modalCancel" onClick={closeStoryModal}>Cancel</button>
+              <button className="ld-btn-ghost" id="modalCancel" onClick={closeStoryModal} disabled={shareBusy}>Cancel</button>
               <button className="ld-btn-ghost" id="modalDownload" onClick={handleDownload} disabled={shareBusy}>
-                Download
+                Download image
               </button>
+              {videoSupported && (
+                <button className="ld-btn-ghost" id="modalDownloadVideo" onClick={handleDownloadVideo} disabled={shareBusy}>
+                  Download video
+                </button>
+              )}
+            </div>
+            {/* Own row so the primary can never be crowded out by the
+                downloads — it is the one action most users came for. */}
+            <div className="ld-modal-actions ld-modal-actions--primary">
               <button className="ld-btn-primary" id="modalShare" onClick={handleShare} disabled={shareBusy}>
-                {shareBusy ? "Rendering…" : shareSupported ? "Post to Story" : `Save & open ${currentPlatform}`}
+                {shareBusy
+                  ? "Rendering…"
+                  : shareSupported
+                    ? "Post to Story"
+                    : `Save ${videoSupported ? "video" : "image"} & open ${currentPlatform}`}
               </button>
             </div>
             <p className={`ld-share-status${shareTone}`} role="status" aria-live="polite">

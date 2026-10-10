@@ -4,15 +4,17 @@ import sabrielImage from "../assets/sabriel.png";
 import aeronImage from "../assets/aeron.png";
 import emersonImage from "../assets/emerson.png";
 import khingImage from "../assets/khing.png";
+import ryoImage from "../assets/ryo.jpg";
 
 const teamMembers = [
   {
     name: "Justin Ryo Jaudines",
     role: "Mentor",
+    image: ryoImage,
     socials: [
       { label: "Github", href: "#", icon: "github" },
-      { label: "LinkedIn", href: "#", icon: "linkedin" },
-      { label: "Facebook", href: "#", icon: "facebook" },
+      { label: "LinkedIn", href: "https://www.linkedin.com/in/justinryojaudines/", icon: "linkedin" },
+      { label: "Facebook", href: "https://www.facebook.com/justoreeo", icon: "facebook" },
       { label: "Instagram", href: "#", icon: "instagram" },
       { label: "X", href: "#", icon: "x" },
     ],
