@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
 const categories = ["Inquiry", "Support", "Partnership", "Feedback"];
+const CONTACT_EMAIL = "laradama.app@gmail.com";
 
 function GithubIcon({ className }) {
   return (
@@ -55,19 +56,58 @@ export default function ContactPage() {
     description: "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   function handleChange(event) {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitError("");
+
+    try {
+      const response = await fetch(`https://formsubmit.co/ajax/${CONTACT_EMAIL}`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          name: form.name,
+          email: form.email,
+          category: form.category,
+          message: form.description,
+          _subject: `[Laradama] ${form.category}`,
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || (result.success !== true && result.success !== "true")) {
+        throw new Error(result.message || "The email service could not accept your message.");
+      }
+
+      setSubmitted(true);
+    } catch (error) {
+      const friendlyMessage =
+        error instanceof TypeError && error.message.toLowerCase().includes("fetch")
+          ? "We couldn't send your message right now. Please try again in a moment."
+          : error instanceof Error
+            ? error.message
+            : "We couldn't send your message. Please try again or email us directly.";
+
+      setSubmitError(friendlyMessage);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function resetForm() {
     setSubmitted(false);
+    setSubmitError("");
     setForm({ name: "", category: categories[0], email: "", description: "" });
   }
 
@@ -93,7 +133,7 @@ export default function ContactPage() {
           </p>
 
           <div className="mt-7 flex justify-start gap-4 text-[#8e8e92]">
-            <a href="mailto:savvv.business@gmail.com" aria-label="Email" className="transition hover:opacity-80">
+            <a href={`mailto:${CONTACT_EMAIL}`} aria-label="Email" className="transition hover:opacity-80">
               <Mail className="h-6 w-6" strokeWidth={1.5} />
             </a>
             <a href="https://github.com/s4burieru/laradama" aria-label="GitHub" className="transition hover:opacity-80">
@@ -182,11 +222,22 @@ export default function ContactPage() {
                 />
               </label>
 
+              {submitError && (
+                <p className="text-sm text-[#ff9b9b]" role="alert">
+                  {submitError} If the problem continues, email{" "}
+                  <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>
+                    {CONTACT_EMAIL}
+                  </a>
+                  .
+                </p>
+              )}
+
               <button
                 type="submit"
-                className="flex w-full items-center justify-center gap-2 border border-laradama-brand bg-transparent px-5 py-3 text-base font-semibold text-laradama-brand transition hover:bg-laradama-brand/10"
+                disabled={submitting}
+                className="flex w-full items-center justify-center gap-2 border border-laradama-brand bg-transparent px-5 py-3 text-base font-semibold text-laradama-brand transition hover:bg-laradama-brand/10 disabled:cursor-wait disabled:opacity-60"
               >
-                Submit
+                {submitting ? "Sending..." : "Submit"}
               </button>
             </form>
           ) : (

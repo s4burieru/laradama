@@ -4,15 +4,17 @@ import sabrielImage from "../assets/sabriel.png";
 import aeronImage from "../assets/aeron.png";
 import emersonImage from "../assets/emerson.png";
 import khingImage from "../assets/khing.png";
+import ryoImage from "../assets/ryo.jpg";
 
 const teamMembers = [
   {
     name: "Justin Ryo Jaudines",
     role: "Mentor",
+    image: ryoImage,
     socials: [
       { label: "Github", href: "#", icon: "github" },
-      { label: "LinkedIn", href: "#", icon: "linkedin" },
-      { label: "Facebook", href: "#", icon: "facebook" },
+      { label: "LinkedIn", href: "https://www.linkedin.com/in/justinryojaudines/", icon: "linkedin" },
+      { label: "Facebook", href: "https://www.facebook.com/justoreeo", icon: "facebook" },
       { label: "Instagram", href: "#", icon: "instagram" },
       { label: "X", href: "#", icon: "x" },
     ],
@@ -139,7 +141,9 @@ export default function TeamPage() {
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <a
                 className="inline-flex items-center gap-2 border border-laradama-brand px-5 py-3 text-sm font-semibold text-laradama-brand transition hover:bg-laradama-brand/10"
-                href="/contact"
+                href="https://docs.google.com/forms/d/e/1FAIpQLSfm8nflCuzbT6JmUdFnMQ7xcPt9hjt9vL1517YIHyXQvk3J_Q/viewform?usp=dialog"
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 Apply Now <span aria-hidden="true">→</span>
               </a>

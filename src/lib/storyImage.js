@@ -1,33 +1,46 @@
 /**
- * Story image export — draws the four story templates (clean / meme / vinyl /
- * neon) to a 1080x1920 PNG with Canvas2D.
+ * Story image export — draws the story templates (clean / meme / vinyl /
+ * neon / collage) to a canvas with Canvas2D.
  *
- * The layout mirrors the `.ld-story-*` rules in src/index.css: those px values
- * are authored against the modal's big preview (`.ld-story-card.ld-big`, 150px
- * wide), so every one of them is multiplied by S = width / 150 to keep the
- * export proportionally identical to what the modal shows. Change a template
- * in CSS and change it here too.
+ * Every size, colour and layout value comes from the shared config in
+ * src/data/storyTemplates.js — the same numbers the live preview
+ * (src/components/StoryPreview.jsx) renders with. Those values are authored in
+ * "design px" against a 150px-wide card, so each one is multiplied by
+ * s = width / 150 here to keep the export proportionally identical to the
+ * preview. To restyle a template, edit the config; nothing in this file needs
+ * to change unless a template gains a brand-new *kind* of element.
+ *
+ * The painters are time-parameterized: `draw(t, { levels, still })` paints the
+ * frame at `t` seconds, driven by the template's `anim` config through the
+ * pure helpers in src/lib/storyMotion.js. `renderStoryImage` (the PNG export)
+ * draws `still: true` — entrance finished, loops at phase 0 — so the still
+ * image keeps its pre-motion look exactly. The video export
+ * (src/lib/storyVideo.js) reuses `prepareStoryPainter` and draws every frame
+ * in real time, with the music's band levels feeding the neon EQ.
  *
  * No dependencies and no DOM screenshots — the photo is already a data URL
  * (nothing taints the canvas) and Montserrat is loaded by index.html, so
  * `document.fonts.load()` makes the text render in the real webfont.
  */
 
+import { fillText, templates } from '../data/storyTemplates';
+import {
+  discAngleDeg,
+  entranceP,
+  eqHeightsAt,
+  kenBurnsScale,
+  marqueeOffsetFrac,
+  popScale,
+} from './storyMotion';
+
 export const STORY_W = 1080; // Instagram / Facebook story canvas, 9:16
 export const STORY_H = 1920;
 
-const REF_W = 150; // px — width of .ld-story-card.ld-big, the size CSS is authored for
+const REF_W = 150; // px — the design width the config's values are authored against
 const FONT_STACK = 'Montserrat, ui-sans-serif, system-ui, sans-serif';
 const FONT_WAIT_MS = 2500; // ms — give up waiting on the webfont and draw with the fallback
 const BRAND = '#1ed760';
 const BRAND_DEEP = '#0f8a3f';
-
-/**
- * Still frame of `@keyframes eq` (14px -> 44px). The preview pulses all seven
- * bars in sync; a static PNG gets an equalizer curve instead of seven equal
- * columns, sampled from the same 14..44px range.
- */
-const EQ_HEIGHTS = [14, 30, 44, 22, 38, 18, 26];
 
 /* ------------------------------------------------------------------ utils */
 
@@ -203,15 +216,23 @@ function drawText(ctx, text, opts) {
 }
 
 /**
- * `.ld-story-wm` — the Laradama logo + label, flush to a corner. The gradient
- * square only shows if the logo image could not be decoded.
+ * The Laradama logo + label, flush to a corner. Reads the shared watermark
+ * config (text / mark / gap / size / weight / colour). The gradient square only
+ * shows if the logo image could not be decoded.
+ *
+ * @param {object} opts
+ * @param {object} opts.cfg the template's `watermark` config
+ * @param {number} opts.edge x-distance from the anchored edge (px, already scaled)
+ * @param {number} opts.y top y (px, already scaled)
+ * @param {'left'|'right'} opts.align
  */
-function drawWatermark(ctx, { edge, y, align, label, s, logo = null }) {
-  const mark = 20 * s; // .ld-story-logo box
-  const gap = 4 * s;
-  const size = 9 * s;
+function drawWatermark(ctx, { cfg, edge, y, align, s, logo = null }) {
+  const mark = cfg.mark * s;
+  const gap = cfg.gap * s;
+  const size = cfg.size * s;
+  const label = String(cfg.text ?? '');
   ctx.save();
-  ctx.font = `700 ${size}px ${FONT_STACK}`;
+  ctx.font = `${cfg.weight} ${size}px ${FONT_STACK}`;
   const textW = ctx.measureText(label).width;
   ctx.restore();
   const right = align === 'right';
@@ -229,25 +250,73 @@ function drawWatermark(ctx, { edge, y, align, label, s, logo = null }) {
     y: y + mark / 2,
     baseline: 'middle',
     size,
-    weight: 700,
+    weight: cfg.weight,
+    color: cfg.color,
     align: right ? 'right' : 'left',
   });
 }
 
+function drawCenteredWatermark(ctx, { cfg, cx, cy, s, logo = null }) {
+  const mark = cfg.mark * s;
+  const gap = cfg.gap * s;
+  const size = cfg.size * s;
+  const label = String(cfg.text ?? '');
+  ctx.save();
+  ctx.font = `${cfg.weight} ${size}px ${FONT_STACK}`;
+  const textW = ctx.measureText(label).width;
+  ctx.restore();
+  const totalW = mark + gap + textW;
+  const markX = cx - totalW / 2;
+  const y = cy - mark / 2;
+  if (logo) {
+    drawContain(ctx, logo, markX, y, mark, mark);
+  } else {
+    const grad = cssLinearGradient(ctx, `linear-gradient(135deg,${BRAND},${BRAND_DEEP})`, markX, y, mark, mark);
+    ctx.fillStyle = grad || BRAND;
+    ctx.fillRect(markX, y, mark, mark);
+  }
+  drawText(ctx, label, {
+    x: markX + mark + gap,
+    y: cy,
+    baseline: 'middle',
+    size,
+    weight: cfg.weight,
+    color: cfg.color,
+  });
+}
+
+/** Compute drawWatermark's edge/y/align from a template's watermark config. */
+function watermarkArgs(cfg, w, h, s) {
+  return cfg.corner
+    ? { cfg, edge: w - cfg.edge * s, y: h - cfg.edge * s - cfg.mark * s, align: 'right', s }
+    : { cfg, edge: cfg.edge * s, y: cfg.edge * s, align: 'left', s };
+}
+
+/** Fill a full-frame vertical scrim from `{ stop, color }` stops (fractions of height). */
+function paintScrim(ctx, w, h, stops) {
+  if (!stops?.length) return;
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  stops.forEach((st) => grad.addColorStop(st.stop, st.color));
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
 /**
- * `.ld-story-bg` — the photo (cover / contain / blurred), or the song's demo
- * gradient when there is no photo yet.
+ * The photo backdrop (cover / contain / blurred), or the song's demo gradient
+ * when there is no photo yet. `mode` is the template's `backdrop` config value;
+ * `zoom` is the Ken Burns factor (>1 crops tighter as the clip progresses).
  */
-function paintBackdrop(ctx, w, h, s, song, photo, mode) {
+function paintBackdrop(ctx, w, h, s, song, photo, mode, zoom = 1) {
   const grad = cssLinearGradient(ctx, song?.gradient, 0, 0, w, h);
 
   if (mode === 'blur') {
-    // .ld-story-bg.blurbg = cover + filter blur(16px) brightness(.4) + scale(1.3).
+    // backdrop: 'blur' = cover + filter blur(16px) brightness(.4) + scale(1.3).
     // The overshoot keeps the blur from pulling transparent edges in.
-    const x = -0.15 * w;
-    const y = -0.15 * h;
-    const bw = 1.3 * w;
-    const bh = 1.3 * h;
+    const k = 1.3 * zoom;
+    const bw = w * k;
+    const bh = h * k;
+    const x = (w - bw) / 2;
+    const y = (h - bh) / 2;
     const filtered = typeof ctx.filter === 'string';
     if (filtered) ctx.filter = `blur(${16 * s}px) brightness(0.4)`;
     if (photo) {
@@ -272,7 +341,9 @@ function paintBackdrop(ctx, w, h, s, song, photo, mode) {
     return;
   }
   if (photo) {
-    drawCover(ctx, photo, 0, 0, w, h);
+    const cw = w * zoom;
+    const ch = h * zoom;
+    drawCover(ctx, photo, (w - cw) / 2, (h - ch) / 2, cw, ch);
     return;
   }
   ctx.fillStyle = grad || '#0a0a0a';
@@ -281,133 +352,157 @@ function paintBackdrop(ctx, w, h, s, song, photo, mode) {
 
 /* --------------------------------------------------------------- templates */
 
-function paintClean(ctx, w, h, s, song, photo, logo) {
-  paintBackdrop(ctx, w, h, s, song, photo, 'cover');
+function paintClean(ctx, w, h, s, song, photo, logo, cfg, frame) {
+  const { t = 0, still = true } = frame || {};
+  paintBackdrop(ctx, w, h, s, song, photo, cfg.backdrop, kenBurnsScale(cfg.anim, t, still));
+  paintScrim(ctx, w, h, cfg.scrim);
+  drawWatermark(ctx, { ...watermarkArgs(cfg.watermark, w, h, s), logo });
 
-  // .ld-story-scrim-b
-  const scrim = ctx.createLinearGradient(0, 0, 0, h);
-  scrim.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  scrim.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
-  scrim.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
-  ctx.fillStyle = scrim;
-  ctx.fillRect(0, 0, w, h);
-
-  drawWatermark(ctx, { edge: 8 * s, y: 8 * s, align: 'left', label: 'laradama', s, logo });
-
-  const pad = 10 * s;
+  const pad = cfg.info.inset * s;
   const maxW = w - pad * 2;
-  const titleFS = 11 * s;
-  const titleLH = titleFS * 1.2; // .ld-story-title line-height
-  const artistFS = 8.5 * s;
-  const artistLH = artistFS * 1.2;
+  const titleFS = cfg.info.title.size * s;
+  const titleLH = titleFS * cfg.info.title.lineHeight;
+  const artistFS = cfg.info.artist.size * s;
+  const artistLH = artistFS * cfg.info.artist.lineHeight;
   // The preview wraps unbounded; stop before the block climbs past mid-frame.
   const maxTitleLines = Math.max(2, Math.floor((h - pad - 0.45 * h) / titleLH));
 
   ctx.save();
-  ctx.font = `700 ${titleFS}px ${FONT_STACK}`;
+  ctx.font = `${cfg.info.title.weight} ${titleFS}px ${FONT_STACK}`;
   const titleLines = wrapText(ctx, song.title, maxW, maxTitleLines);
   ctx.restore();
 
-  // .ld-story-info hangs off the bottom edge, so lay it out from there up.
-  let bottom = h - pad;
-  drawText(ctx, `${song.artist} · trending now`, {
+  // Entrance: the info block fades in, rising from just below its final spot.
+  const p = entranceP(cfg.anim, t, still);
+  const rise = (1 - p) * (cfg.anim?.rise ?? 0) * s;
+  ctx.save();
+  ctx.globalAlpha = p;
+  // The info block hangs off the bottom edge, so lay it out from there up.
+  let bottom = h - pad + rise;
+  drawText(ctx, fillText(cfg.info.artist.text, song), {
     x: pad,
     y: bottom,
     baseline: 'bottom',
     size: artistFS,
-    weight: 400,
-    color: 'rgba(255, 255, 255, 0.75)',
+    weight: cfg.info.artist.weight,
+    color: cfg.info.artist.color,
     maxWidth: maxW,
   });
-  bottom -= artistLH + 1 * s; // .ld-story-artist margin-top
+  bottom -= artistLH + cfg.info.artist.marginTop * s;
   titleLines.forEach((line, i) => {
     drawText(ctx, line, {
       x: pad,
       y: bottom - titleLH * (titleLines.length - 1 - i),
       baseline: 'bottom',
       size: titleFS,
-      weight: 700,
+      weight: cfg.info.title.weight,
+      color: cfg.info.title.color,
       maxWidth: maxW,
     });
   });
+  ctx.restore();
 }
 
-function paintMeme(ctx, w, h, s, song, photo, logo) {
-  paintBackdrop(ctx, w, h, s, song, photo, 'contain');
+function paintMeme(ctx, w, h, s, song, photo, logo, cfg, frame) {
+  const { t = 0, still = true } = frame || {};
+  paintBackdrop(ctx, w, h, s, song, photo, cfg.backdrop);
 
-  const size = 7.8 * s;
-  const padY = 5 * s;
-  const padX = 6 * s;
-  const innerW = w - padX * 2;
-  const linesOf = (text, fontSize) => {
-    const upper = String(text ?? '').toUpperCase();
+  const bar = cfg.bar;
+  const padY = bar.padY * s;
+  const padX = bar.padX * s;
+  const linesOf = (text, fontSize, maxWidth) => {
+    const upper = bar.uppercase ? String(text ?? '').toUpperCase() : String(text ?? '');
     ctx.save();
-    ctx.font = `700 ${fontSize}px ${FONT_STACK}`;
-    const lh = fontSize * 1.25; // .ld-meme-bar line-height
+    ctx.font = `${bar.weight} ${fontSize}px ${FONT_STACK}`;
+    const lh = fontSize * bar.lineHeight;
     // The bars grow with their text in the preview, so wrap first and size the
     // bar afterwards — capped so a runaway title cannot swallow the frame.
     const maxLines = Math.max(1, Math.floor((0.4 * h) / lh));
-    const lines = wrapText(ctx, upper, innerW, maxLines);
+    const lines = wrapText(ctx, upper, maxWidth, maxLines);
     ctx.restore();
     return lines;
   };
-  const bar = (text, top, fontSize = size) => {
-    const lh = fontSize * 1.25; // .ld-meme-bar line-height
-    const lines = linesOf(text, fontSize);
-    const barH = padY * 2 + lines.length * lh;
-    ctx.fillStyle = '#fff';
+  const drawBar = (text, top, fontSize, layout = {}, p = 1, dir = -1) => {
+    const lh = fontSize * bar.lineHeight;
+    const contentLeft = layout.contentLeft ?? padX;
+    const contentRight = layout.contentRight ?? w - padX;
+    const contentW = contentRight - contentLeft;
+    const lines = linesOf(text, fontSize, contentW);
+    const barH = Math.max(
+      padY * 2 + lines.length * lh,
+      layout.minHeight ?? 0,
+    );
+    // Entrance: the bar slides in from its own edge (dir) while fading up.
+    ctx.save();
+    ctx.globalAlpha = p;
+    ctx.translate(0, (1 - p) * (cfg.anim?.rise ?? 0) * s * dir);
+    ctx.fillStyle = bar.bg;
     ctx.fillRect(0, top, w, barH);
     lines.forEach((line, i) => {
       drawText(ctx, line, {
-        x: w / 2,
+        x: (contentLeft + contentRight) / 2,
         y: top + padY + lh * (i + 0.5),
         baseline: 'middle',
-        align: 'center',
+        align: bar.align,
         size: fontSize,
-        weight: 700,
-        color: '#000',
-        maxWidth: innerW,
+        weight: bar.weight,
+        color: bar.color,
+        maxWidth: contentW,
       });
     });
+    ctx.restore();
+    return barH;
   };
 
-  // The caption is centred, so at the bottom bar's size it would start around
-  // x=17 and touch the logo sitting at x=4..17 — a hair smaller buys ~6px of
-  // clearance. Mirrored by `.ld-meme-bar.top { font-size }`.
-  bar("my photo's soundtrack is", 0, 7 * s);
+  drawBar(fillText(cfg.top.text, song), 0, cfg.top.size * s, {}, entranceP(cfg.anim, t, still), -1);
 
-  // .ld-meme-bar .ld-story-logo — tucked into the top bar's left corner, on
-  // top of the white fill. Capped at 13 design px like the CSS: any bigger and
-  // the centred caption would run into it.
-  if (logo) drawContain(ctx, logo, 4 * s, 3 * s, 13 * s, 13 * s);
+  const bottomFS = cfg.bottom.size * s;
+  const bottomText = fillText(cfg.bottom.text, song);
+  const logoSize = logo ? cfg.logo.size * s : 0;
+  // Wrap against the full bar width: the logo no longer sits inside the bar.
+  const bottomLines = linesOf(bottomText, bottomFS, w - padX * 2);
+  const bottomBarH = padY * 2 + bottomLines.length * (bottomFS * bar.lineHeight);
+  const bottomBarTop = h - bottomBarH;
+  const pBottom = entranceP(cfg.anim, t - (cfg.anim?.stagger ?? 0), still);
+  drawBar(bottomText, bottomBarTop, bottomFS, {}, pBottom, 1);
 
-  const bottomLines = linesOf(song.title, size);
-  bar(song.title, h - (padY * 2 + bottomLines.length * (size * 1.25)));
+  if (logo) {
+    // Outside the bar, resting on its top edge — anchored to `bottomBarTop`,
+    // so a taller (multi-line) bar carries the logo up with it. It rides the
+    // bar's entrance the same way the preview's does.
+    const logoTop = bottomBarTop - cfg.logo.bottom * s - logoSize;
+    const logoLeft = w - cfg.logo.right * s - logoSize;
+    ctx.save();
+    ctx.globalAlpha = pBottom;
+    ctx.translate(0, (1 - pBottom) * (cfg.anim?.rise ?? 0) * s);
+    drawContain(ctx, logo, logoLeft, logoTop, logoSize, logoSize);
+    ctx.restore();
+  }
 }
 
-function paintVinyl(ctx, w, h, s, song, photo, logo) {
-  paintBackdrop(ctx, w, h, s, song, photo, 'blur');
+function paintVinyl(ctx, w, h, s, song, photo, logo, cfg, frame) {
+  const { t = 0, still = true } = frame || {};
+  paintBackdrop(ctx, w, h, s, song, photo, cfg.backdrop, kenBurnsScale(cfg.anim, t, still));
 
-  // .ld-vinyl-disc — a circular record (border-radius: 50%), centred at 50% /
-  // 38% and 62% of the card wide. Every layer beneath is round too.
-  const disc = 0.62 * w;
+  // A circular record. Every layer beneath is round too.
+  const disc = cfg.disc.size * w;
   const r = disc / 2;
-  const cx = w / 2;
-  const cy = 0.38 * h;
+  const cx = cfg.disc.cx * w;
+  const cy = cfg.disc.cy * h;
 
   ctx.save();
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-  ctx.shadowBlur = 24 * s;
-  ctx.shadowOffsetY = 8 * s;
-  ctx.fillStyle = '#111';
+  ctx.shadowColor = cfg.disc.shadowColor;
+  ctx.shadowBlur = cfg.disc.shadowBlur * s;
+  ctx.shadowOffsetY = cfg.disc.shadowY * s;
+  ctx.fillStyle = cfg.disc.bg;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  // .ld-vinyl-photo — inset 12% and clipped to the inner circle. With no photo
-  // the preview paints the song gradient into that box instead, so do the same.
-  const inner = r - 0.12 * disc;
+  // Inner photo circle, clipped round. With no photo the preview paints the
+  // song gradient into that box instead, so do the same.
+  const inner = r - cfg.photo.inset * disc;
   const ix = cx - inner;
   const iy = cy - inner;
   const isz = inner * 2;
@@ -415,110 +510,147 @@ function paintVinyl(ctx, w, h, s, song, photo, logo) {
   ctx.beginPath();
   ctx.arc(cx, cy, inner, 0, Math.PI * 2);
   ctx.clip();
-  if (photo) drawCover(ctx, photo, ix, iy, isz, isz);
-  else {
-    ctx.fillStyle = cssLinearGradient(ctx, song?.gradient, ix, iy, isz, isz) || '#111';
+  if (photo) {
+    // The photo spins with the disc; 1.5x its box keeps the rotated corners
+    // covering the full circle at every angle.
+    const box = isz * 1.5;
+    ctx.translate(cx, cy);
+    ctx.rotate((discAngleDeg(cfg.anim, t, still) * Math.PI) / 180);
+    drawCover(ctx, photo, -box / 2, -box / 2, box, box);
+  } else {
+    ctx.fillStyle = cssLinearGradient(ctx, song?.gradient, ix, iy, isz, isz) || cfg.disc.bg;
     ctx.fillRect(ix, iy, isz, isz);
   }
   ctx.restore();
 
-  // .ld-vinyl-grooves — circular inset rings at 4/11/18/25px. Each translucent
-  // white band stacks over the ones beneath it, so paint thick → thin. Two
-  // subpaths per ring + the even-odd rule turn the disc into an annulus.
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-  [25, 18, 11, 4].forEach((t) => {
-    const k = t * s;
+  // Grooves — circular inset rings. Each translucent band stacks over the ones
+  // beneath it, so paint thick → thin. Two subpaths per ring + the even-odd
+  // rule turn the disc into an annulus.
+  ctx.fillStyle = cfg.grooves.color;
+  [...cfg.grooves.widths].sort((a, b) => b - a).forEach((width) => {
+    const k = width * s;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.arc(cx, cy, r - k, 0, Math.PI * 2);
     ctx.fill('evenodd');
   });
 
-  // .ld-vinyl-hole — 8% of the disc, dead centre, painted last (z-index 3),
-  // with the CSS's 2px light hub ring sitting just outside its edge.
-  const hole = 0.08 * disc;
+  // Hub — dead centre, painted last (z-index 3), with a light ring just outside
+  // its edge.
+  const hole = cfg.hole.size * disc;
   ctx.beginPath();
   ctx.arc(cx, cy, hole / 2, 0, Math.PI * 2);
-  ctx.fillStyle = '#141416';
+  ctx.fillStyle = cfg.hole.bg;
   ctx.fill();
   ctx.save();
-  ctx.lineWidth = 2 * s;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+  ctx.lineWidth = cfg.hole.ring * s;
+  ctx.strokeStyle = cfg.hole.ringColor;
   ctx.beginPath();
   ctx.arc(cx, cy, hole / 2 + s, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 
-  // .ld-vinyl-caption (bottom-anchored, wraps unbounded in the preview) +
-  // the corner watermark.
-  const capFS = 8.5 * s;
-  const capLH = capFS * 1.2;
-  const capW = w - 20 * s;
-  const capBottom = h - 0.12 * h; // .ld-vinyl-caption bottom — clears the corner logo
-  const maxCapLines = Math.max(1, Math.floor((capBottom - (cy + r) - 8 * s) / capLH));
+  // Centered caption and watermark sit below the disc.
+  const titleFS = cfg.caption.title.size * s;
+  const artistFS = cfg.caption.artist.size * s;
+  const titleLH = titleFS * cfg.caption.lineHeight;
+  const artistLH = artistFS * cfg.caption.lineHeight;
+  const artistMargin = cfg.caption.artist.marginTop * s;
+  const capW = w - cfg.caption.padX * 2 * s;
+  const capTop = cy + r + cfg.caption.gap * s;
+  const maxCapLines = Math.max(1, Math.floor((h - capTop - 8 * s) / titleLH));
   ctx.save();
-  ctx.font = `600 ${capFS}px ${FONT_STACK}`;
-  const capLines = wrapText(ctx, `${song.title} — ${song.artist}`, capW, maxCapLines);
+  ctx.font = `${cfg.caption.title.weight} ${titleFS}px ${FONT_STACK}`;
+  const titleLines = wrapText(ctx, fillText(cfg.caption.title.text, song), capW, maxCapLines);
+  ctx.font = `${cfg.caption.artist.weight} ${artistFS}px ${FONT_STACK}`;
+  const artistLines = wrapText(ctx, fillText(cfg.caption.artist.text, song), capW, maxCapLines);
   ctx.restore();
-  capLines.forEach((line, i) => {
+  // Entrance: the caption fades in, rising toward the disc. The watermark is
+  // branding — it stays put.
+  const capP = entranceP(cfg.anim, t, still);
+  ctx.save();
+  ctx.globalAlpha = capP;
+  ctx.translate(0, (1 - capP) * (cfg.anim?.rise ?? 0) * s);
+  titleLines.forEach((line, i) => {
     drawText(ctx, line, {
       x: w / 2,
-      y: capBottom - capLH * (capLines.length - 1 - i),
-      baseline: 'bottom',
+      y: capTop + titleLH * (i + 0.5),
+      baseline: 'middle',
       align: 'center',
-      size: capFS,
-      weight: 600,
+      size: titleFS,
+      weight: cfg.caption.title.weight,
+      color: cfg.caption.color,
       maxWidth: capW,
     });
   });
-  drawWatermark(ctx, { edge: w - 8 * s, y: h - 8 * s - 20 * s, align: 'right', label: 'laradama', s, logo });
+  const artistTop = capTop + titleLines.length * titleLH + artistMargin;
+  artistLines.forEach((line, i) => {
+    drawText(ctx, line, {
+      x: w / 2,
+      y: artistTop + artistLH * (i + 0.5),
+      baseline: 'middle',
+      align: 'center',
+      size: artistFS,
+      weight: cfg.caption.artist.weight,
+      color: cfg.caption.color,
+      maxWidth: capW,
+    });
+  });
+  ctx.restore();
+  drawCenteredWatermark(ctx, {
+    cfg: cfg.watermark,
+    cx: w / 2,
+    cy: h - cfg.watermark.edge * s - (cfg.watermark.mark * s) / 2,
+    s,
+    logo,
+  });
 }
 
-function paintNeon(ctx, w, h, s, song, photo, logo) {
-  paintBackdrop(ctx, w, h, s, song, photo, 'cover');
+function paintNeon(ctx, w, h, s, song, photo, logo, cfg, frame) {
+  const { t = 0, still = true, levels = null } = frame || {};
+  paintBackdrop(ctx, w, h, s, song, photo, cfg.backdrop, kenBurnsScale(cfg.anim, t, still));
 
-  // .ld-neon-duotone — mix-blend-mode: color over the photo only, so it runs
-  // before any of the foreground and the context restores the blend mode.
+  // Duotone — mix-blend-mode: color over the photo only, so it runs before any
+  // of the foreground and the context restores the blend mode.
   ctx.save();
-  ctx.globalCompositeOperation = 'color';
-  ctx.fillStyle =
-    cssLinearGradient(
-      ctx,
-      'linear-gradient(160deg, rgba(30, 215, 96, 0.55), rgba(255, 107, 74, 0.5))',
-      0,
-      0,
-      w,
-      h,
-    ) || 'rgba(30, 215, 96, 0.4)';
+  ctx.globalCompositeOperation = cfg.duotone.blend;
+  ctx.fillStyle = cssLinearGradient(ctx, cfg.duotone.gradient, 0, 0, w, h) || cfg.duotone.fallback;
   ctx.fillRect(0, 0, w, h);
   ctx.restore();
 
-  // .ld-story-wm — top-left, above the duotone (z-index 2 in the preview).
-  drawWatermark(ctx, { edge: 8 * s, y: 8 * s, align: 'left', label: 'laradama', s, logo });
+  drawWatermark(ctx, { ...watermarkArgs(cfg.watermark, w, h, s), logo });
 
-  // .ld-neon-eq — 7 bars, 3px wide, 3px apart, sitting on the 24% line.
-  const barW = 3 * s;
-  const gap = 3 * s;
-  const total = EQ_HEIGHTS.length * barW + (EQ_HEIGHTS.length - 1) * gap;
-  const baseY = h - 0.24 * h;
+  // Equalizer — bars sitting on the eq baseline, growing upward. In motion
+  // they dance to the track's real band levels (or a synthetic stand-in when
+  // there is no audio); the still frame keeps the authored heights.
+  const barW = cfg.eq.width * s;
+  const gap = cfg.eq.gap * s;
+  const total = cfg.eq.heights.length * barW + (cfg.eq.heights.length - 1) * gap;
+  const baseY = h - cfg.eq.bottom * h;
+  const heights = eqHeightsAt(cfg.anim, levels, t, still, cfg.eq.heights);
   let x = (w - total) / 2;
-  ctx.fillStyle = '#fff';
-  for (const value of EQ_HEIGHTS) {
+  ctx.fillStyle = cfg.eq.color;
+  for (const value of heights) {
     const bh = value * s;
     ctx.fillRect(x, baseY - bh, barW, bh);
     x += barW + gap;
   }
 
-  // .ld-neon-title — bottom 13%, centred, with the CSS text-shadow glow. It
-  // may wrap upward only as far as the equalizer's baseline above it.
-  const titleFS = 9 * s;
-  const titleLH = titleFS * 1.2;
-  const titleBottom = h - 0.13 * h;
+  // Title — centred, with the text-shadow glow. It may wrap upward only as far
+  // as the equalizer's baseline above it.
+  const titleFS = cfg.title.size * s;
+  const titleLH = titleFS * cfg.title.lineHeight;
+  const titleBottom = h - cfg.title.bottom * h;
   const maxTitleLines = Math.max(1, Math.floor((titleBottom - baseY) / titleLH));
+  const titlePadX = cfg.title.padX * s;
   ctx.save();
-  ctx.font = `700 ${titleFS}px ${FONT_STACK}`;
-  const lines = wrapText(ctx, song.title, w - 16 * s, maxTitleLines);
+  ctx.font = `${cfg.title.weight} ${titleFS}px ${FONT_STACK}`;
+  const lines = wrapText(ctx, song.title, w - titlePadX * 2, maxTitleLines);
   ctx.restore();
+  // Entrance: the title fades up while its neon glow blooms in.
+  const titleP = entranceP(cfg.anim, t, still);
+  ctx.save();
+  ctx.globalAlpha = titleP;
   lines.forEach((line, i) => {
     drawText(ctx, line, {
       x: w / 2,
@@ -526,43 +658,145 @@ function paintNeon(ctx, w, h, s, song, photo, logo) {
       baseline: 'bottom',
       align: 'center',
       size: titleFS,
-      weight: 700,
-      letterSpacing: '0.02em',
-      maxWidth: w - 16 * s,
-      shadow: { blur: 8 * s },
+      weight: cfg.title.weight,
+      letterSpacing: cfg.title.letterSpacing,
+      color: cfg.title.color,
+      maxWidth: w - titlePadX * 2,
+      shadow: { blur: cfg.title.shadowBlur * s * titleP, color: cfg.title.shadowColor },
     });
+  });
+  ctx.restore();
+
+  // Watermark strip. In motion it is a single-line marquee scrolling left at
+  // one `strip.text` width per loop (any self-repeating string tiles seamlessly
+  // at its own full width). The still frame keeps the wrapped, centred strip it
+  // has always exported.
+  const stripFS = cfg.strip.size * s;
+  const stripLH = stripFS * cfg.strip.lineHeight;
+  const stripPad = cfg.strip.padY * s;
+  const stripText = fillText(cfg.strip.text, song);
+  ctx.save();
+  ctx.font = `${cfg.strip.weight} ${stripFS}px ${FONT_STACK}`;
+  if (still) {
+    const stripLines = wrapText(ctx, stripText, w, Math.max(1, Math.floor((0.1 * h) / stripLH)));
+    ctx.restore();
+    const stripH = stripPad * 2 + stripLines.length * stripLH;
+    ctx.fillStyle = cfg.strip.bg;
+    ctx.fillRect(0, h - stripH, w, stripH);
+    const stripTop = h - stripH + stripPad;
+    stripLines.forEach((line, i) => {
+      drawText(ctx, line, {
+        x: w / 2,
+        y: stripTop + stripLH * (i + 0.5),
+        baseline: 'middle',
+        align: 'center',
+        size: stripFS,
+        weight: cfg.strip.weight,
+        color: cfg.strip.color,
+        letterSpacing: cfg.strip.letterSpacing,
+        maxWidth: w,
+      });
+    });
+    return;
+  }
+  if ('letterSpacing' in ctx) ctx.letterSpacing = cfg.strip.letterSpacing || '0px';
+  const loopW = ctx.measureText(stripText).width || w;
+  const off = marqueeOffsetFrac(cfg.anim, t, still) * loopW;
+  const stripH = stripPad * 2 + stripLH;
+  ctx.fillStyle = cfg.strip.bg;
+  ctx.fillRect(0, h - stripH, w, stripH);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, h - stripH, w, stripH);
+  ctx.clip();
+  for (let sx = -off; sx < w; sx += loopW) {
+    drawText(ctx, stripText, {
+      x: sx,
+      y: h - stripH / 2,
+      baseline: 'middle',
+      size: stripFS,
+      weight: cfg.strip.weight,
+      color: cfg.strip.color,
+      letterSpacing: cfg.strip.letterSpacing,
+    });
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+function paintCollage(ctx, w, h, s, song, photo, logo, cfg, frame) {
+  const { t = 0, still = true } = frame || {};
+  const pad = cfg.pad * s;
+  const gap = cfg.gap * s;
+  const cols = cfg.cols;
+  const rows = cfg.rows;
+  const tileW = (w - pad * 2 - gap * (cols - 1)) / cols;
+  const tileH = (h - pad * 2 - cfg.bottomReserve * s - gap * (rows - 1)) / rows;
+  const kb = kenBurnsScale(cfg.anim, t, still);
+
+  ctx.fillStyle = cfg.bg;
+  ctx.fillRect(0, 0, w, h);
+
+  for (let i = 0; i < cols * rows; i += 1) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = pad + col * (tileW + gap);
+    const y = pad + row * (tileH + gap);
+    // Entrance: each tile pops in (scale + fade), staggered reading order.
+    const { scale, alpha } = popScale(cfg.anim, t, i, still);
+    const tw = tileW * scale;
+    const th = tileH * scale;
+    const tx = x + (tileW - tw) / 2;
+    const ty = y + (tileH - th) / 2;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.rect(tx, ty, tw, th);
+    ctx.clip();
+    if (photo) {
+      const cw = tw * kb;
+      const ch = th * kb;
+      drawCover(ctx, photo, tx + (tw - cw) / 2, ty + (th - ch) / 2, cw, ch);
+    } else {
+      ctx.fillStyle = cssLinearGradient(ctx, song?.gradient, tx, ty, tw, th) || '#191919';
+      ctx.fillRect(tx, ty, tw, th);
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = cfg.tile.border;
+    ctx.lineWidth = cfg.tile.borderWidth * s;
+    const inset = (cfg.tile.borderWidth / 2) * s;
+    ctx.strokeRect(tx + inset, ty + inset, tw - inset * 2, th - inset * 2);
+    ctx.restore();
+  }
+
+  paintScrim(ctx, w, h, cfg.scrim);
+
+  // The caption bar arrives after the last tile has popped.
+  const capP = entranceP(
+    cfg.anim,
+    t - cols * rows * (cfg.anim?.stagger ?? 0) - 0.15,
+    still,
+  );
+  ctx.save();
+  ctx.globalAlpha = capP;
+  const barH = cfg.bar.height * s;
+  const barY = h - barH;
+  ctx.fillStyle = cfg.bar.bg;
+  ctx.fillRect(0, barY, w, barH);
+
+  // Brand lockup centred in the bar.
+  drawCenteredWatermark(ctx, {
+    cfg: cfg.brand,
+    cx: w / 2,
+    cy: barY + (cfg.brand.y + cfg.brand.mark / 2) * s,
+    s,
+    logo,
   });
 
-  // .ld-neon-wm-strip — the text is slightly wider than the frame, so the
-  // preview wraps it onto a second line and grows the strip upward.
-  const stripFS = 6 * s;
-  const stripLH = stripFS * 1.2;
-  const pad = 3 * s;
-  ctx.save();
-  ctx.font = `400 ${stripFS}px ${FONT_STACK}`;
-  const stripLines = wrapText(
-    ctx,
-    'laradama  •  laradama  •  laradama',
-    w,
-    Math.max(1, Math.floor((0.1 * h) / stripLH)),
-  );
   ctx.restore();
-  const stripH = pad * 2 + stripLines.length * stripLH;
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-  ctx.fillRect(0, h - stripH, w, stripH);
-  const stripTop = h - stripH + pad;
-  stripLines.forEach((line, i) => {
-    drawText(ctx, line, {
-      x: w / 2,
-      y: stripTop + stripLH * (i + 0.5),
-      baseline: 'middle',
-      align: 'center',
-      size: stripFS,
-      color: 'rgba(255, 255, 255, 0.65)',
-      letterSpacing: '0.04em',
-      maxWidth: w,
-    });
-  });
 }
 
 const PAINTERS = {
@@ -570,21 +804,25 @@ const PAINTERS = {
   meme: paintMeme,
   vinyl: paintVinyl,
   neon: paintNeon,
+  collage: paintCollage,
 };
 
 /* ------------------------------------------------------------------ public */
 
 /**
- * Render one story template to a PNG blob at 9:16.
+ * Prepare a story template for drawing: loads fonts, the photo and the logo
+ * once, then hands back a canvas plus a `draw(t, { levels, still })` that
+ * paints one frame. Both exporters use it — the PNG still and every frame of
+ * the MP4.
  *
  * @param {object} opts
  * @param {{title: string, artist: string, gradient?: string}} opts.song
- * @param {string} [opts.templateId] clean | meme | vinyl | neon
+ * @param {string} [opts.templateId] clean | meme | vinyl | neon | collage
  * @param {string|null} [opts.uploadedImage] data URL of the user's photo
- * @param {number} [opts.width] export width (height follows the 9:16 frame)
- * @returns {Promise<Blob>}
+ * @param {number} [opts.width] frame width (height follows the 9:16 frame)
+ * @returns {Promise<{canvas: HTMLCanvasElement, draw: Function}>}
  */
-export async function renderStoryImage({
+export async function prepareStoryPainter({
   song,
   templateId = 'clean',
   uploadedImage = null,
@@ -608,8 +846,33 @@ export async function renderStoryImage({
     : null;
 
   const paint = PAINTERS[templateId] || paintClean;
+  const cfg = templates[templateId] || templates.clean;
   const logo = await loadLogo();
-  paint(ctx, width, height, s, song, photo, logo);
+
+  return {
+    canvas,
+    /**
+     * Paint the frame at `t` seconds. `still` freezes entrance animations and
+     * loop phases (the PNG export); `levels` are the audio band levels from
+     * storyMotion.levelsForPcm (null → synthetic stand-in for the EQ).
+     */
+    draw(t = 0, { levels = null, still = false } = {}) {
+      ctx.clearRect(0, 0, width, height);
+      paint(ctx, width, height, s, song, photo, logo, cfg, { t, still, levels });
+    },
+  };
+}
+
+/**
+ * Render one story template to a PNG blob at 9:16 — the settled still frame of
+ * the same motion the video export animates.
+ *
+ * @param {object} opts see `prepareStoryPainter`
+ * @returns {Promise<Blob>}
+ */
+export async function renderStoryImage(opts = {}) {
+  const { canvas, draw } = await prepareStoryPainter(opts);
+  draw(0, { still: true });
 
   return await new Promise((resolve, reject) => {
     try {

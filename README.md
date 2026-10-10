@@ -25,41 +25,97 @@ recommend music that fits the image.
 
 ## Story Sharing
 
-Laradama generates a shareable story from the user's image and recommended music. The story template includes the image, song information, and Laradama branding in a format optimized for social media stories.
+Laradama generates a shareable story from the user's image and recommended music —
+either an **animated video with the music baked in** (the primary "Post to Story"
+path) or a static PNG ("Download image"), in a format optimized for social media
+stories.
 
-Four templates ship (`clean`, `meme`, `vinyl`, `neon`), previewed live in the
-story modal. Posting one runs through:
+Five templates ship (`clean`, `meme`, `vinyl`, `neon`, `collage`), previewed
+live in the story modal. Each template's editable values — sizes, colours,
+layout, copy **and motion** — live in a single config, `src/data/storyTemplates.js`,
+that the live preview (`src/components/StoryPreview.jsx`), the PNG still and the
+video export all read. Because they share those numbers they can never drift; to
+restyle or retime a template, edit its object (its `anim` block for the motion) —
+no CSS or canvas changes needed.
+
+### The still image (PNG)
 
 1. **Render** — `src/lib/storyImage.js` redraws the selected template with
    Canvas2D at **1080×1920** (the 9:16 story canvas) and returns a PNG blob.
-   Every px value in the `.ld-story-*` CSS is authored for the modal's 150px
+   Every size in the config is authored in "design px" against the modal's 150px
    preview, so the canvas multiplies them by `S = width / 150` and stays
-   pixel-proportional to it — **a template change in `src/index.css` needs the
-   matching change in `storyImage.js`.** The photo comes in as a data URL, so
+   pixel-proportional to the live preview. The photo comes in as a data URL, so
    the canvas never goes origin-tainted, and `document.fonts.load()` guarantees
    the Montserrat weights are resident before the text is drawn.
+   The still is the *settled frame* of the same motion the video animates
+   (`draw(0, { still: true })` — entrances finished, loops at phase 0), so a
+   template's PNG looks exactly like it did before motion existed.
    The render runs **as soon as the modal opens a template** (and again on
    every template/track/photo change), not at click time: it takes seconds,
    and browsers revoke a click's user activation after ~5s — once that lapses
    `navigator.share`, `window.open` and the `instagram://` jump are all
    refused. The buttons just reuse the pre-rendered blob.
-2. **Share** — `src/lib/storyShare.js` tries `navigator.share({ files })`
-   (Web Share Level 2) first: it is the only API that can push an image into
-   the native share sheet from a web page, and mobile browsers are the only
-   place it exists. There the user picks Instagram or Facebook directly.
-3. **Fallback** — where Web Share is missing or throws (anything other than
-   the user cancelling), the PNG is saved as `laradama-<platform>-story.png`
-   and the platform is opened: on phones the app URL scheme first
-   (`instagram://story-camera`, `fb://…`), falling through to the website only
-   if the page never loses focus; on desktop straight to the website, where an
-   unregistered protocol would only pop an error dialog. The website open is
-   popup-blockable, so a refused popup falls back to navigating the current
-   tab — the button can never silently do nothing. The modal stays open
-   and spells out the last step ("open Instagram, start a Story, pick it"),
-   and the primary button relabels itself to `Save & open <platform>` when the
-   browser has no share sheet at all.
+2. **Share** — `src/lib/storyShare.js` hands the file to `navigator.share({
+   files })` (Web Share Level 2): the only API that can push a file into the
+   native share sheet from a web page, and mobile browsers are the only place
+   it exists. The blob goes **straight from memory to the OS sheet** — nothing
+   touches Downloads — and the user picks Instagram or Facebook directly.
+   Cancelling the sheet is not an error; a sheet that refuses to open (or a
+   browser without one) reports `failed` and the modal's status line points at
+   the Download buttons instead of saving a file the user never asked for.
+3. **Save & open (no share sheet)** — where Web Share is missing (desktop,
+   older mobile browsers) the primary button relabels itself to
+   `Save video & open <platform>` and runs the explicit
+   `saveAndOpenStoryFile`: the file is saved as
+   `laradama-<platform>-story.<ext>` and the platform is opened — on phones
+   the app URL scheme first (`instagram://story-camera`, `fb://…`), falling
+   through to the website only if the page never loses focus; on desktop
+   straight to the website, where an unregistered protocol would only pop an
+   error dialog. The website open is popup-blockable, so a refused popup falls
+   back to navigating the current tab — the button can never silently do
+   nothing. The modal stays open and spells out the last step ("open
+   Instagram, start a Story, pick it").
 
-A separate **Download** button exports the same PNG without opening anything.
+Two separate **Download** buttons export without opening anything —
+**Download image** (the PNG) and **Download video** (the MP4, hidden where the
+browser cannot encode one).
+
+### The video (MP4, music included)
+
+"Post to Story" renders **15 seconds** of the animated template with the matched
+song's preview as its audio track — `src/lib/storyVideo.js`:
+
+- **Motion** — each template's `anim` config is evaluated by the pure helpers in
+  `src/lib/storyMotion.js`, which every renderer shares: the vinyl disc spins
+  (its photo rotates inside the clipped circle), the neon EQ bars dance **to the
+  track's real frequency bands** (one-pole low/mid/high RMS windows computed per
+  video frame from the decoded preview), the neon strip marquee-scrolls, photos
+  Ken-Burns-zoom, and text/bars/tiles fade- and pop-in staggered. The live
+  preview runs the same helpers on a rAF clock with synthetic EQ levels (it
+  cannot hear the track), and honours `prefers-reduced-motion` by freezing on
+  the settled frame.
+- **Encode** — the canvas paints all 450 frames (15s × 30fps) into a Mediabunny
+  `CanvasSource` (WebCodecs H.264 — hardware-accelerated where available) while
+  the decoded, 15s-trimmed preview rides an `AudioBufferSource` (AAC) into the
+  same MP4 (`fastStart`, so the metadata sits up front for social imports).
+  Rendering runs faster than realtime — the modal shows a live percentage — and
+  each frame waits on the encoder's own backpressure, so memory stays bounded.
+  No `MediaRecorder`, no realtime recording wait.
+- **Audio** — iTunes and Audius previews both serve with
+  `Access-Control-Allow-Origin: *`, so the fetch is plain CORS. A failed
+  fetch/decode — or a track with no free preview (Spotify-only cards) — exports
+  a **silent video** (the EQ then bounces to a synthetic stand-in), announced in
+  the modal's status line. The fetch + decode is pre-warmed while the user
+  browses templates, so the click only pays for encoding.
+- **Share** — the MP4 (`laradama-<platform>-story.mp4`) rides the same paths as
+  the PNG: sheet-only on mobile (`navigator.share({files})`, nothing written to
+  Downloads), explicit save-and-open on browsers without a sheet, and the two
+  Download buttons for the manual route.
+- **Support** — `canExportVideo()` probes for real WebCodecs encoders (H.264 at
+  1080×1920 + AAC) once on load. iOS Safari (16.4+) and current Chrome (desktop
+  and Android) qualify; anything without them keeps the PNG flow end-to-end and
+  the buttons label themselves "image". Mediabunny is code-split behind the
+  modal, so none of its bytes load on the initial page.
 
 
 ## Local Setup

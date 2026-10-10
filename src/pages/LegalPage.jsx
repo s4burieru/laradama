@@ -31,14 +31,14 @@ const legalContent = {
       {
         title: "Service providers and links",
         paragraphs: [
-          "Some features may rely on third-party providers, such as hosting, image analysis, or music services. Information needed to provide a feature may be handled by those providers under their own privacy policies and terms. Music previews and links may take you to third-party services; their practices are not controlled by Laradama.",
+          "Some features may rely on third-party providers, such as hosting, image analysis, or music services. Contact form submissions are sent to FormSubmit to deliver messages to us; the name, email address, category, and message you submit are handled by that provider under its own privacy policy and terms. Information needed to provide a feature may be handled by those providers under their own privacy policies and terms. Music previews and links may take you to third-party services; their practices are not controlled by Laradama.",
         ],
       },
       {
         title: "Retention and your choices",
         paragraphs: [
           "Information is kept only for as long as it is needed for the purpose it was collected, subject to applicable legal and operational requirements. Actual retention can vary depending on the service involved. You can choose not to submit an image or contact form details, though some features may then be unavailable.",
-          "To ask about personal information you have shared with us, contact savvv.business@gmail.com. We may need to verify your request and may be unable to fulfill it where an exception under applicable law applies.",
+          "To ask about personal information you have shared with us, contact laradama.app@gmail.com. We may need to verify your request and may be unable to fulfill it where an exception under applicable law applies.",
         ],
       },
       {
@@ -94,7 +94,7 @@ const legalContent = {
       {
         title: "Changes and contact",
         paragraphs: [
-          "We may update these terms by publishing a revised version on this page. Continued use after the update means you accept the revised terms. Questions about these terms can be sent to savvv.business@gmail.com.",
+          "We may update these terms by publishing a revised version on this page. Continued use after the update means you accept the revised terms. Questions about these terms can be sent to laradama.app@gmail.com.",
         ],
       },
     ],
