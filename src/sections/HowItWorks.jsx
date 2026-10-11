@@ -16,8 +16,8 @@ const steps = [
   },
   {
     n: "04 — REFINE",
-    title: "Swipe to reshuffle",
-    desc: "Not feeling it? Swipe and get another match instantly. Keep it, and Laradama tells you exactly why it chose that song.",
+    title: "Tap to reshuffle",
+    desc: "Not feeling it? Tap next track and get another match instantly. Keep it, and Laradama tells you exactly why it chose that song.",
   },
 ];
 

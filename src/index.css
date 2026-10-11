@@ -116,8 +116,9 @@
 .ld-spotify-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
 .ld-icon-btn { width: 40px; height: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; transition: transform 0.12s; }
 .ld-icon-btn:hover:not(:disabled) { transform: translateY(-2px); }
-.ld-icon-btn.ig { background: linear-gradient(135deg, #4f5bd5, #962fbf, #d62976, #fa7e1e, #feda75); }
-.ld-icon-btn.fb { background: #1877f2; }
+/* The card's one share button — the platform choice lives in the modal. */
+.ld-icon-btn.share { background: var(--color-laradama-brand); color: #06170c; }
+.ld-icon-btn.share:hover:not(:disabled) { background: var(--color-laradama-brand-hover); }
 .ld-icon-btn svg { width: 17px; height: 17px; }
 /* While a photo is being matched there is no track to listen to or share yet. */
 .ld-spotify-btn:disabled, .ld-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
@@ -240,6 +241,9 @@
 .ld-stage-nav.next { right: 0; }
 .ld-stage-nav:hover { border-color: var(--color-laradama-brand); color: var(--color-laradama-brand); }
 .ld-stage-nav:focus-visible { outline: 2px solid var(--color-laradama-brand); outline-offset: 2px; }
+/* Locked while a render runs — same quiet "not now" the other controls use. */
+.ld-stage-nav:disabled { opacity: 0.4; cursor: default; }
+.ld-stage-nav:disabled:hover { border-color: var(--color-laradama-line); color: var(--color-laradama-ink); }
 .ld-stage-nav svg { width: 18px; height: 18px; }
 .ld-template-meta { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .ld-template-name { font-family: var(--font-mono); font-size: 11px; color: var(--color-laradama-dim); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -252,6 +256,8 @@
 .ld-dot:hover { transform: scale(1.35); }
 .ld-dot.on { background: var(--color-laradama-brand); transform: scale(1.15); }
 .ld-dot:focus-visible { outline: 2px solid var(--color-laradama-brand); outline-offset: 2px; }
+.ld-dot:disabled { cursor: default; }
+.ld-dot:disabled:hover { transform: none; }
 /* Features-page tiles: a template rendered as a labelled <article>. (The
    modal's tile *buttons* — selection ring, hover lift, check badge — went
    with the thumbnail strip; its picker is the stage carousel above.) */
@@ -296,6 +302,13 @@
   .ld-feature-template-item { flex-basis: calc((100% - 10px) / 2); }
   .ld-feature-template-picker .ld-template-scroll { flex-basis: 24px; width: 24px; }
 }
+/* Destination picker — only rendered where no native sheet picks the app. */
+.ld-platform-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.ld-platform-label { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-laradama-dimmer); margin-right: 2px; }
+.ld-platform-btn { font-size: 11.5px; font-weight: 700; padding: 6px 11px; border: 1px solid var(--color-laradama-line); background: transparent; color: var(--color-laradama-dim); cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+.ld-platform-btn:hover:not(:disabled):not(.on) { border-color: var(--color-laradama-dimmer); color: var(--color-laradama-ink); }
+.ld-platform-btn.on { background: var(--color-laradama-brand); border-color: var(--color-laradama-brand); color: #06170c; }
+.ld-platform-btn:disabled { opacity: 0.55; cursor: default; }
 /* Actions + status pin to the bottom of the panel while it scrolls, so
    Download / Post stay reachable on a short phone screen. */
 .ld-modal-foot { position: sticky; bottom: 0; margin-top: 24px; padding-top: 14px; padding-bottom: 26px; background: var(--color-laradama-elevated); box-shadow: 0 -14px 16px -12px var(--color-laradama-elevated); z-index: 3; }

@@ -87,6 +87,24 @@ Two separate **Download** buttons export without opening anything —
 **Download image** (the PNG) and **Download video** (the MP4, hidden where the
 browser cannot encode one).
 
+Two details of the flow around them:
+
+- **One share button, one modal** — the song card has a single Share button on
+  every device; the Instagram/Facebook pair is gone from it. Where a native
+  sheet exists (`canShareFiles()`, touch-only by construction) the sheet's own
+  picker chooses the platform, so the modal says so and offers no choice of its
+  own. Where there is no sheet (desktop, in-app webviews, older mobile) the
+  modal footer carries a small **Post to Instagram / Facebook** toggle, and that
+  pick drives the `laradama-<platform>-story.<ext>` file name, the app
+  `saveAndOpenStoryFile` opens, and the status line. The button reopens the
+  modal on the last platform chosen.
+- **The music freezes with the modal** — opening it pauses the track and
+  closing it resumes, but only if it was actually playing. A track left running
+  would reach its end mid-browse, roll into the next match, change the story
+  key and throw away the render in progress; `timeupdate` would also keep
+  re-rendering the card behind the dialog. The export is unaffected: the video
+  decodes its audio through an `OfflineAudioContext`, not the page's element.
+
 ### The video (MP4, music included)
 
 "Post to Story" renders **15 seconds** of the animated template with the matched
