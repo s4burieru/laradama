@@ -48,13 +48,20 @@ function devApi({ geminiKey, spotifyId, spotifySecret }) {
   return {
     name: 'laradama-dev-api',
     configureServer(server) {
-      // --- Gemini (vision AI) ---
+      // --- Gemini (vision AI) — /api/gemini?model=<id>, twin of api/gemini.js ---
       server.middlewares.use('/api/gemini', async (req, res) => {
         try {
+          if (req.method !== 'POST') {
+            res.setHeader('Allow', 'POST')
+            return send(res, 405, { error: { message: `Method ${req.method} not allowed` } })
+          }
           if (!geminiKey) return send(res, 400, { error: { message: 'GEMINI_API_KEY missing in .env.local — get a free key at https://aistudio.google.com/apikey' } })
+          // Model ids only — mirrors the production function's guard.
+          const model = new URL(req.url || '/', 'http://localhost').searchParams.get('model') || ''
+          if (!/^[a-zA-Z0-9.-]+$/.test(model)) return send(res, 404, { error: { message: 'Not found' } })
           const chunks = []
           for await (const c of req) chunks.push(c)
-          const upstream = await fetch(`https://generativelanguage.googleapis.com${req.url}`, {
+          const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
             body: Buffer.concat(chunks),
