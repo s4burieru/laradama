@@ -1024,7 +1024,7 @@ export default function Hero() {
             <div>
               <h3 id="storyModalTitle">Choose a story template</h3>
               <p>
-                Your photo, the track, and a laradama watermark — pick a style before
+                Your photo, the track, and a laradama watermark. Pick a style before
                 posting to <span id="modalPlatform">{currentPlatform}</span>.
               </p>
             </div>
