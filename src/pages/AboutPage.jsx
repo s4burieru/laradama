@@ -52,7 +52,7 @@ export default function AboutPage() {
           <figure className="mt-10 w-full max-[1100px]:mt-0">
             <div className="relative aspect-[1.72/1] overflow-hidden border-2 border-laradama-brand bg-[#171717]">
               <img
-                src="/our-team.png"
+                src="/our-team.webp"
                 alt="The team behind Laradama"
                 className="h-full w-full object-cover"
               />
