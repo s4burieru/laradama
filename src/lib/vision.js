@@ -232,7 +232,7 @@ async function generateJson(body, modelList = VISION_MODELS) {
   for (const model of [...modelList, ...modelList]) {
     let res;
     try {
-      res = await fetch(`/api/gemini/v1beta/models/${model}:generateContent`, {
+      res = await fetch(`/api/gemini?model=${encodeURIComponent(model)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
