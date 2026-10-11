@@ -579,8 +579,28 @@ export default function Hero() {
    */
   const storyRenderRef = useRef(null); // { key, blob: Promise<Blob> }
   const storyRenderSeqRef = useRef(0);
+  // The finished Story waiting for its share sheet, tagged with the render it
+  // came from. Held instead of re-encoded so a second tap can hand
+  // `navigator.share` a file with no `await` in front of it — a fresh gesture
+  // carries the fresh ~5s user activation the sheet requires.
+  const [heldStory, setHeldStory] = useState(null); // { key, blob }
+  // Guards against two rapid taps firing two native sheets back to back.
+  const sheetPendingRef = useRef(false);
+  // Consecutive `no-activation` failures. The first is the render eating the
+  // activation window (retry from a fresh tap); a second one means the tap was
+  // fresh too, so the sheet is genuinely unavailable and a third tap would just
+  // repeat the loop.
+  const activationRetryRef = useRef(0);
   const [preparing, setPreparing] = useState(false);
   const storyKey = `${currentTemplate}|${song?.title || ""}|${song?.artist || ""}|${uploadedImage ? uploadedImage.length : 0}`;
+
+  // Adjusted while rendering — React's alternative to an effect for this: any
+  // change to the template/track/photo voids the held file, and with it the
+  // "tap again" status that belongs to it, so a frame from an earlier Story
+  // can never reach the sheet and no stale message survives the change.
+  const heldValid = Boolean(heldStory && heldStory.key === storyKey);
+  if (heldStory && !heldValid) setHeldStory(null);
+  if (!heldValid && share.phase === "ready") setShare({ phase: "idle", message: "" });
 
   const startStoryRender = () => {
     const pending = renderStoryImage({ song, templateId: currentTemplate, uploadedImage });
@@ -670,31 +690,106 @@ export default function Hero() {
   /** What "Post to Story" shares: the video when the browser can encode one. */
   const renderForShare = async () => (videoSupported ? renderVideoWithProgress() : renderStory());
 
-  const handleShare = async () => {
-    if (shareBusy) return;
+  /**
+   * Status line for a sheet that would not open — one sentence that always
+   * names the control that still works.
+   *
+   * `no-activation` is the interesting one: rendering a video eats the click's
+   * ~5s user-activation window, so by the time the file exists the browser
+   * refuses the share. Nothing is wrong with the file — only a fresh tap is
+   * missing, and the button relabels itself to "Open share sheet" for exactly
+   * that state.
+   */
+  const shareFailureMessage = (res) => {
+    const alt = videoSupported ? "Download video" : "Download image";
+    switch (res?.reason) {
+      case "no-activation":
+        return "Tap Open share sheet again — the browser needs a fresh tap after rendering.";
+      case "unsupported-file":
+        return `This browser can't send ${videoSupported ? "video" : "image"} files — use ${alt} instead.`;
+      case "no-sheet":
+        return `This browser has no share sheet — use ${alt} instead.`;
+      case "in-app":
+        return `You're inside ${currentPlatform}'s in-app browser, which blocks sharing — open this page in Safari or Chrome and tap again.`;
+      default:
+        return `Couldn't open the ${currentPlatform} share sheet — use ${alt} instead.`;
+    }
+  };
+
+  /**
+   * Give an already-rendered Story to the native sheet. It never renders
+   * first: everything up to `navigator.share` runs inside the caller's own
+   * task, so the sheet inherits the tap that asked for it. Called directly
+   * from the button handler — adding an `await render …` in front of it is
+   * what broke this before.
+   */
+  const presentSheet = async (blob) => {
+    // Two taps in a row would otherwise fire two sheets back to back.
+    if (sheetPendingRef.current) return;
+    // Where the browser advertises activation, don't burn a share call we know
+    // it will refuse — go straight to the "tap again" state.
+    if (typeof navigator !== "undefined" && navigator.userActivation?.isActive === false) {
+      setShare({ phase: "ready", message: shareFailureMessage({ reason: "no-activation" }) });
+      return;
+    }
+    sheetPendingRef.current = true;
     try {
-      const blob = await renderForShare();
-      if (shareSupported) {
-        // Sheet-only: the file goes from memory to the OS share sheet and
-        // never touches Downloads. A sheet that won't open says so — it does
-        // not save a file the user never asked for.
-        const res = await shareStoryFile(blob, { platform: currentPlatform, song });
-        if (res.phase === "failed") {
-          setShare({
-            phase: "error",
-            message: `Couldn't open the ${currentPlatform} share sheet — use ${videoSupported ? "Download video" : "Download image"} instead.`,
-          });
-          return;
-        }
+      const res = await shareStoryFile(blob, { platform: currentPlatform, song });
+      if (res.phase !== "failed") {
         setShare({ phase: res.phase, message: res.message });
         // Only a real share closes the modal — cancelled/failed stay open so
         // the message (and the Download buttons) are actionable.
         if (res.phase === "shared") closeStoryModal();
         return;
       }
+      if (res.reason === "no-activation") {
+        const retries = activationRetryRef.current;
+        activationRetryRef.current = retries + 1;
+        if (retries < 1) {
+          // First time round: the render outran the window. The file is in
+          // hand, so the button becomes "Open share sheet" and the next tap
+          // carries a fresh activation.
+          setShare({ phase: "ready", message: shareFailureMessage(res) });
+          return;
+        }
+        // The second attempt came from a fresh tap, so this isn't the render.
+        setShare({ phase: "error", message: shareFailureMessage({ reason: "unknown" }) });
+        return;
+      }
+      setShare({ phase: "error", message: shareFailureMessage(res) });
+    } catch (err) {
+      // `shareStoryFile` reports its own failures; this only catches a throw
+      // from the plumbing around it (e.g. an empty export).
+      console.warn("[story] share could not run:", err);
+      setShare({ phase: "error", message: shareFailureMessage({ reason: "unknown" }) });
+    } finally {
+      sheetPendingRef.current = false;
+    }
+  };
+
+  const handleShare = async () => {
+    if (shareBusy) return;
+    try {
+      // Reuse the previous render whenever the template/track/photo are
+      // unchanged — the sheet path needs the file *now*, inside this click's
+      // activation window, and re-encoding would spend it again.
+      let held = heldValid ? heldStory : null;
+      if (!held) {
+        const rendered = await renderForShare();
+        held = { key: storyKey, blob: rendered };
+        setHeldStory(held);
+        activationRetryRef.current = 0;
+      }
+      if (shareSupported) {
+        // Sheet-only: the file goes from memory to the OS share sheet and
+        // never touches Downloads. A sheet that won't open says so — it does
+        // not save a file the user never asked for.
+        await presentSheet(held.blob);
+        return;
+      }
       // No share sheet (desktop / older browsers): the label says "Save …",
       // so saving first and opening the platform is exactly what was promised.
-      const res = await saveAndOpenStoryFile(blob, { platform: currentPlatform });
+      const res = await saveAndOpenStoryFile(held.blob, { platform: currentPlatform });
       setShare({ phase: res.phase, message: res.message });
     } catch (err) {
       exportFailed(err, videoSupported ? "video" : "image");
@@ -1097,9 +1192,11 @@ export default function Hero() {
               <button className="ld-btn-primary" id="modalShare" onClick={handleShare} disabled={shareBusy}>
                 {shareBusy
                   ? "Rendering…"
-                  : shareSupported
-                    ? "Post to Story"
-                    : `Save ${videoSupported ? "video" : "image"} & open ${currentPlatform}`}
+                  : shareSupported && share.phase === "ready"
+                    ? "Open share sheet"
+                    : shareSupported
+                      ? "Post to Story"
+                      : `Save ${videoSupported ? "video" : "image"} & open ${currentPlatform}`}
               </button>
             </div>
             <p className={`ld-share-status${shareTone}`} role="status" aria-live="polite">

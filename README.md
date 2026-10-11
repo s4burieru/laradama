@@ -63,6 +63,13 @@ no CSS or canvas changes needed.
    Cancelling the sheet is not an error; a sheet that refuses to open (or a
    browser without one) reports `failed` and the modal's status line points at
    the Download buttons instead of saving a file the user never asked for.
+   Because encoding the video costs more than the ~5s of user activation a tap
+   grants, **"Post to Story" is two-phase**: the render runs first, and if the
+   window has lapsed by the time the file exists the primary button relabels
+   itself to `Open share sheet` so the *next* tap calls `navigator.share`
+   inside a fresh activation — the held file is reused rather than re-encoded,
+   and every failure reports a `reason` (`no-activation`, `unsupported-file`,
+   `no-sheet`, `in-app`, `unknown`) that the status line spells out.
 3. **Save & open (no share sheet)** — where Web Share is missing (desktop,
    older mobile browsers) the primary button relabels itself to
    `Save video & open <platform>` and runs the explicit
