@@ -12,10 +12,10 @@ import { recognizableEntries, subjectBlock, visionRefTargets, dHashFromDataUrl }
  * (measured 2.5-3.5s vs 23-54s) and the prompts carry the quality, not the
  * model: describe-both-faces-then-compare kept it honest on the negative
  * controls, and the mood/rerank outputs are short structured objects rather
- * than prose. Flash is the backstop for unparseable output or an outage,
+ * than prose. 3.6-flash is the backstop for unparseable output or an outage,
  * 3.8-flash last (it answers well but is the slowest and the one that 503s).
  */
-export const VISION_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.8-flash'];
+export const VISION_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'];
 
 /** Schema + prompt are built per call so custom scans can extend them (and an
  *  empty customMatches list leaves the request byte-identical to the old one).

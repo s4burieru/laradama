@@ -254,7 +254,7 @@ Both calls run on `VISION_MODELS`, which leads with `gemini-3.5-flash-lite`:
 measured ~10× faster than the strong model (2.5–3.5s vs 23–54s), with the
 prompts carrying the quality — describe-both-faces-then-compare is what kept it
 honest on the negative controls, and the mood/rerank outputs are short
-structured objects rather than prose. `gemini-3.5-flash` and `gemini-3.8-flash`
+structured objects rather than prose. `gemini-3.6-flash` and `gemini-3.8-flash`
 follow as backstops for unparseable output or an outage.
 
 The rest of the wait is bounded too: the identity upload is downscaled to 512px
@@ -379,7 +379,7 @@ as the safety net below them.
 ## Vision Model Note
 
 `src/lib/vision.js` walks `VISION_MODELS` — `gemini-3.5-flash-lite`,
-`gemini-3.5-flash`, `gemini-3.8-flash` — twice over to ride out spikes. The
+`gemini-3.6-flash`, `gemini-3.8-flash` — twice over to ride out spikes. The
 older `gemini-2.x` ids now return **404** ("no longer available to new users")
 on current API keys, which silently drops the app to local color analysis — no
 Gemini mood profile and no subject recognition. If matching looks dull or
