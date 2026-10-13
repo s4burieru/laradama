@@ -1,10 +1,15 @@
 import { useState } from "react";
 import { Check, ChevronDown, Mail, MessageSquareText } from "lucide-react";
+import emailjs from "@emailjs/browser";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
 const categories = ["Inquiry", "Support", "Partnership", "Feedback"];
 const CONTACT_EMAIL = "laradama.app@gmail.com";
+
+const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || "";
+const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "";
+const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "";
 
 function GithubIcon({ className }) {
   return (
@@ -70,34 +75,37 @@ export default function ContactPage() {
     setSubmitError("");
 
     try {
-      const response = await fetch(`https://formsubmit.co/ajax/${CONTACT_EMAIL}`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
+      if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
+        throw new Error("The contact form is not configured yet. Please email us directly.");
+      }
+
+      const result = await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        {
           name: form.name,
           email: form.email,
           category: form.category,
           message: form.description,
-          _subject: `[Laradama] ${form.category}`,
-        }),
-      });
-      const result = await response.json();
+          subject: `[Laradama] ${form.category}`,
+        },
+        { publicKey: EMAILJS_PUBLIC_KEY },
+      );
 
-      if (!response.ok || (result.success !== true && result.success !== "true")) {
-        throw new Error(result.message || "The email service could not accept your message.");
+      if (!result || result.status < 200 || result.status >= 300) {
+        throw new Error(result?.text || "The email service could not accept your message.");
       }
 
       setSubmitted(true);
     } catch (error) {
       const friendlyMessage =
-        error instanceof TypeError && error.message.toLowerCase().includes("fetch")
+        error instanceof TypeError
           ? "We couldn't send your message right now. Please try again in a moment."
-          : error instanceof Error
-            ? error.message
-            : "We couldn't send your message. Please try again or email us directly.";
+          : typeof error?.text === "string" && error.text.trim()
+            ? error.text
+            : error instanceof Error && error.message
+              ? error.message
+              : "We couldn't send your message. Please try again or email us directly.";
 
       setSubmitError(friendlyMessage);
     } finally {
