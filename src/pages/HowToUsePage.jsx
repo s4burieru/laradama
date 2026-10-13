@@ -1,4 +1,4 @@
-import { ArrowDown, Image as ImageIcon } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
@@ -47,19 +47,12 @@ function StepImagePlaceholder({ number, title }) {
       <span className="absolute left-4 top-4 font-mono text-xs tracking-[0.12em] text-laradama-brand">
         STEP {number}
       </span>
-      <div className="flex h-14 w-14 items-center justify-center border border-laradama-brand/40 bg-laradama-brand/10 text-laradama-brand">
-        <ImageIcon className="h-7 w-7" strokeWidth={1.5} aria-hidden="true" />
-      </div>
-      <span className="mt-4 text-sm font-medium text-[#d0d0d0]">
+      <span className="text-sm font-medium text-[#d0d0d0]">
         Image placeholder
       </span>
       <span className="mt-1 text-xs text-[#777]">
         Add a screenshot or illustration for this step
       </span>
-      <span
-        className="pointer-events-none absolute -bottom-20 -right-10 h-48 w-48 rounded-full bg-laradama-brand/5 blur-3xl"
-        aria-hidden="true"
-      />
     </div>
   );
 }
@@ -69,36 +62,35 @@ export default function HowToUsePage() {
     <div className="min-h-screen bg-[#121212] font-sans text-white">
       <Navbar />
       <main>
-        <section className="border-b border-[#383838]">
-          <div className="mx-auto max-w-375 px-6 py-16 md:px-8 md:py-20 max-[640px]:py-12">
-            <p className="font-mono text-xs tracking-[0.12em] text-laradama-brand">
-              YOUR GUIDE / 4 SIMPLE STEPS
-            </p>
-            <h1 className="mt-4 max-w-200 font-display text-4xl font-bold leading-tight text-white max-[640px]:text-[32px]">
-              From a photo to a{" "}
-              <span className="text-laradama-brand">feeling in music.</span>
-            </h1>
-            <p className="mt-5 max-w-165 text-base leading-[1.7] text-[#999] sm:text-lg">
-              Upload or take a photo. Laradama App checks its mood, colors, and
-              movement to find a trending song that matches its vibe. Don&apos;t
-              like the song? Just swipe to find another one you might like.
-            </p>
-            <a
-              href="#steps"
-              className="mt-8 inline-flex items-center gap-2 border border-laradama-brand px-5 py-3 text-sm font-medium text-laradama-brand transition-colors hover:bg-laradama-brand/10"
-            >
-              Explore the steps
-              <ArrowDown className="h-4 w-4" aria-hidden="true" />
-            </a>
-          </div>
-        </section>
+        <section aria-label="How to use Laradama">
+          <header>
+            <div className="mx-auto max-w-375 px-6 pb-6 pt-12 text-center md:px-8 md:pb-8 md:pt-16 max-[640px]:pb-4 max-[640px]:pt-10">
+              <h1 className="mx-auto mt-4 max-w-200 font-display text-4xl font-bold leading-tight text-laradama-brand max-[640px]:text-[36px]">
+                From a photo to{" "}
+                <span className="text-laradama-brand">feeling in music.</span>
+              </h1>
+              <p className="mx-auto mt-5 max-w-240 text-base leading-[1.7] text-[#858585] sm:text-lg">
+                Upload or take a photo. Laradama App checks its mood, colors,
+                and movement to find a trending song that matches its vibe.
+                Don&apos;t like the song? Just tap next to find another one you
+                might like.
+              </p>
+              <a
+                href="#steps"
+                className="mt-8 inline-flex items-center gap-2 border border-laradama-brand px-5 py-3 text-sm font-medium text-laradama-brand transition-colors hover:bg-laradama-brand/10"
+              >
+                Explore the steps
+                <ArrowDown className="h-4 w-4" aria-hidden="true" />
+              </a>
+            </div>
+          </header>
 
-        <section
-          id="steps"
-          className="mx-auto max-w-375 px-6 py-12 md:px-8 md:py-16 max-[640px]:px-6"
-          aria-label="How to use Laradama"
-        >
-          <div className="grid gap-5">
+          <section
+            id="steps"
+            className="mx-auto max-w-375 px-6 py-12 md:px-8 md:py-16 max-[640px]:px-6"
+            aria-label="How to use Laradama"
+          >
+            <div className="grid gap-5">
             {steps.map((step, index) => (
               <article
                 key={step.number}
@@ -123,7 +115,8 @@ export default function HowToUsePage() {
                 </div>
               </article>
             ))}
-          </div>
+            </div>
+          </section>
         </section>
       </main>
       <Footer />
