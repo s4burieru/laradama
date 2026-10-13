@@ -63,6 +63,13 @@ no CSS or canvas changes needed.
    Cancelling the sheet is not an error; a sheet that refuses to open (or a
    browser without one) reports `failed` and the modal's status line points at
    the Download buttons instead of saving a file the user never asked for.
+   Because encoding the video costs more than the ~5s of user activation a tap
+   grants, **"Post to Story" is two-phase**: the render runs first, and if the
+   window has lapsed by the time the file exists the primary button relabels
+   itself to `Open share sheet` so the *next* tap calls `navigator.share`
+   inside a fresh activation — the held file is reused rather than re-encoded,
+   and every failure reports a `reason` (`no-activation`, `unsupported-file`,
+   `no-sheet`, `in-app`, `unknown`) that the status line spells out.
 3. **Save & open (no share sheet)** — where Web Share is missing (desktop,
    older mobile browsers) the primary button relabels itself to
    `Save video & open <platform>` and runs the explicit
@@ -79,6 +86,24 @@ no CSS or canvas changes needed.
 Two separate **Download** buttons export without opening anything —
 **Download image** (the PNG) and **Download video** (the MP4, hidden where the
 browser cannot encode one).
+
+Two details of the flow around them:
+
+- **One share button, one modal** — the song card has a single Share button on
+  every device; the Instagram/Facebook pair is gone from it. Where a native
+  sheet exists (`canShareFiles()`, touch-only by construction) the sheet's own
+  picker chooses the platform, so the modal says so and offers no choice of its
+  own. Where there is no sheet (desktop, in-app webviews, older mobile) the
+  modal footer carries a small **Post to Instagram / Facebook** toggle, and that
+  pick drives the `laradama-<platform>-story.<ext>` file name, the app
+  `saveAndOpenStoryFile` opens, and the status line. The button reopens the
+  modal on the last platform chosen.
+- **The music freezes with the modal** — opening it pauses the track and
+  closing it resumes, but only if it was actually playing. A track left running
+  would reach its end mid-browse, roll into the next match, change the story
+  key and throw away the render in progress; `timeupdate` would also keep
+  re-rendering the card behind the dialog. The export is unaffected: the video
+  decodes its audio through an `OfflineAudioContext`, not the page's element.
 
 ### The video (MP4, music included)
 
@@ -254,7 +279,7 @@ Both calls run on `VISION_MODELS`, which leads with `gemini-3.5-flash-lite`:
 measured ~10× faster than the strong model (2.5–3.5s vs 23–54s), with the
 prompts carrying the quality — describe-both-faces-then-compare is what kept it
 honest on the negative controls, and the mood/rerank outputs are short
-structured objects rather than prose. `gemini-3.5-flash` and `gemini-3.8-flash`
+structured objects rather than prose. `gemini-3.6-flash` and `gemini-3.8-flash`
 follow as backstops for unparseable output or an outage.
 
 The rest of the wait is bounded too: the identity upload is downscaled to 512px
@@ -379,7 +404,7 @@ as the safety net below them.
 ## Vision Model Note
 
 `src/lib/vision.js` walks `VISION_MODELS` — `gemini-3.5-flash-lite`,
-`gemini-3.5-flash`, `gemini-3.8-flash` — twice over to ride out spikes. The
+`gemini-3.6-flash`, `gemini-3.8-flash` — twice over to ride out spikes. The
 older `gemini-2.x` ids now return **404** ("no longer available to new users")
 on current API keys, which silently drops the app to local color analysis — no
 Gemini mood profile and no subject recognition. If matching looks dull or

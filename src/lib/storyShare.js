@@ -8,8 +8,12 @@
  *     the one API that can push a file into the native share sheet from a web
  *     page (mobile browsers are the only place it exists). The blob goes
  *     straight from memory to the sheet — nothing touches Downloads. A sheet
- *     that refuses to open reports `failed` rather than silently saving a file
- *     the user never asked for; the caller points at the Download buttons.
+ *     that refuses to open reports `failed` — plus a `reason` that says *why*
+ *     (`no-activation`, `unsupported-file`, `no-sheet`, `in-app`, `unknown`)
+ *     rather than silently saving a file the user never asked for; the caller
+ *     turns the reason into an actionable status line. Everything up to the
+ *     `navigator.share` call is synchronous, so a caller that invokes this
+ *     straight from a click hands the sheet that click's user activation.
  *   • `saveAndOpenStoryFile` — the explicit desktop/sheet-less fallback: save
  *     the file, then open the platform (phone URL scheme first, website as
  *     backstop). The button that calls it says "Save …" in its label.
@@ -36,6 +40,17 @@ export const isTouchDevice = () =>
   typeof window !== 'undefined' &&
   ((typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches) ||
     /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ''));
+
+/**
+ * Is the page running inside another app's webview — Instagram, Facebook,
+ * X/TikTok? Those shells routinely ship without `navigator.share`, or refuse
+ * to hand a file to the very app they live in, so a share failure here is
+ * their doing and the fix is a real browser (Safari/Chrome), not a retry.
+ */
+export const isInAppBrowser = () => {
+  if (typeof navigator === 'undefined') return false;
+  return /\bInstagram\b|FBAN|FBAV|Twitter|TikTok|LinkedInApp/i.test(navigator.userAgent || '');
+};
 
 /** 'video/mp4' -> 'mp4', 'image/png' -> 'png' — what the file name ends in. */
 const extOf = (blob) => {
@@ -187,30 +202,84 @@ function shareText(song) {
  * open (or a browser without one) comes back as `failed` so the caller can
  * point at the Download buttons instead of saving unasked.
  *
+ * Call this **from inside the click** that should open the sheet: every step
+ * before `navigator.share` is synchronous, so the sheet inherits the tap's
+ * ~5s user activation. Awaiting a render first is what loses it — which is
+ * exactly what `reason: 'no-activation'` reports back.
+ *
  * @param {Blob} blob rendered story (PNG or MP4)
  * @param {{platform?: string, song?: {title: string, artist: string}}} opts
- * @returns {Promise<{phase: 'shared'|'cancelled'|'failed', message: string}>}
+ * @returns {Promise<{phase: 'shared'|'cancelled'|'failed', reason: string|null, errName: string|null, message: string}>}
+ *   `reason` — `no-activation` (the tap's window expired; retry from a fresh
+ *   tap), `unsupported-file` (`canShare` refuses this file, not just the
+ *   probe), `no-sheet` (no Web Share here at all), `in-app` (running inside
+ *   the platform's own webview), `unknown`.
  */
 export async function shareStoryFile(blob, { platform = 'Instagram', song } = {}) {
   if (!blob?.size) throw new Error('the rendered Story export came back empty');
+
+  // Inside a webview every failure has the same cure — open the page in a
+  // real browser — so it overrides the finer-grained reasons below.
+  const inApp = isInAppBrowser();
+  const fail = (reason, message) => ({
+    phase: 'failed',
+    reason: inApp ? 'in-app' : reason,
+    errName: null,
+    message,
+  });
+
   if (!shareFilesSupport()) {
-    return { phase: 'failed', message: 'This browser has no share sheet.' };
+    return fail('no-sheet', 'This browser has no share sheet.');
   }
+
   const file = toFile(blob, storyFileName(platform, extOf(blob)));
+
+  // The probe in `shareFilesSupport` only proves `image/png` is shareable;
+  // the actual file can still be refused (an MP4 where the browser has no
+  // video target), which `navigator.share` would report as a bare TypeError.
+  if (typeof navigator.canShare === 'function') {
+    let shareable;
+    try {
+      shareable = navigator.canShare({ files: [file] });
+    } catch {
+      shareable = false;
+    }
+    if (!shareable) {
+      const kind = extOf(blob) === 'mp4' ? 'video' : 'image';
+      return fail('unsupported-file', `This browser cannot send ${kind} files.`);
+    }
+  }
+
   try {
     await navigator.share({ files: [file], title: 'Laradama story', text: shareText(song) });
-    return { phase: 'shared', message: `Shared to ${platform}.` };
+    return { phase: 'shared', reason: null, errName: null, message: `Shared to ${platform}.` };
   } catch (err) {
     if (err?.name === 'AbortError') {
       return {
         phase: 'cancelled',
+        reason: null,
+        errName: 'AbortError',
         message: 'Share cancelled — your Story is ready whenever you want it.',
       };
     }
-    // NotAllowedError / SecurityError / a share target that choked: report it
-    // and let the user choose a Download button — no silent save.
+    // NotAllowedError (no user activation left), TypeError (refused data), or
+    // a share target that choked: report which, and let the caller choose the
+    // retry vs. the Download buttons — no silent save.
     console.warn('[story] navigator.share failed:', err);
-    return { phase: 'failed', message: 'Could not open the share sheet.' };
+    const errName = typeof err?.name === 'string' ? err.name : 'Error';
+    const reason =
+      errName === 'TypeError'
+        ? 'unsupported-file'
+        : errName === 'NotAllowedError' || errName === 'SecurityError'
+          ? 'no-activation'
+          : 'unknown';
+    return {
+      phase: 'failed',
+      // Same override as `fail`: inside a webview the webview is the reason.
+      reason: inApp ? 'in-app' : reason,
+      errName,
+      message: 'Could not open the share sheet.',
+    };
   }
 }
 

@@ -1,10 +1,10 @@
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import sabrielImage from "../assets/sabriel.png";
-import aeronImage from "../assets/aeron.png";
-import emersonImage from "../assets/emerson.png";
-import khingImage from "../assets/khing.png";
-import ryoImage from "../assets/ryo.jpg";
+import sabrielImage from "../assets/sabriel.webp";
+import aeronImage from "../assets/aeron.webp";
+import emersonImage from "../assets/emerson.webp";
+import khingImage from "../assets/khing.webp";
+import ryoImage from "../assets/ryo.webp";
 
 const teamMembers = [
   {
