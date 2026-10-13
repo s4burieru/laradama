@@ -13,7 +13,8 @@ import Navbar from "../components/Navbar";
 import Cta from "../sections/Cta";
 import Footer from "../components/Footer";
 import TrendingMusicPlayer from "../components/TrendingMusicPlayer";
-import { renderStoryTemplate, songs, storyTemplates } from "../sections/Hero";
+import StoryPreview from "../components/StoryPreview";
+import { songs, storyTemplates } from "../sections/Hero";
 
 const features = [
   { icon: ImagePlus, title: "Image Upload & Capture", description: "Upload a photo or capture a new moment directly from your device." },
@@ -79,7 +80,7 @@ export default function FeaturesPage() {
               <div className="ld-feature-template-track" ref={templateScrollerRef}>
               {storyTemplates.map((template) => (
                 <article key={template.id} className="ld-thumb-wrap ld-feature-template-item">
-                  <div className="ld-story-card thumb" dangerouslySetInnerHTML={{ __html: renderStoryTemplate(songs[0], template.id) }} />
+                  <StoryPreview className="thumb" song={songs[0]} templateId={template.id} />
                   <span className="ld-thumb-label text-xs! font-normal uppercase sm:text-sm!">{template.label}</span>
                 </article>
               ))}

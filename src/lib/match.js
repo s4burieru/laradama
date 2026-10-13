@@ -81,7 +81,7 @@ async function rerankOnce(model, text, tracks) {
     const timer = setTimeout(() => ctrl.abort(), 6000); // the deck is waiting on this
     let res;
     try {
-      res = await fetch(`/api/gemini/v1beta/models/${model}:generateContent`, {
+      res = await fetch(`/api/gemini?model=${encodeURIComponent(model)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: ctrl.signal,

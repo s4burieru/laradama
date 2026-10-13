@@ -1,12 +1,24 @@
 /**
- * Story sharing — gets the rendered 1080x1920 PNG onto an Instagram or
- * Facebook Story.
+ * Story sharing — gets the rendered 1080x1920 PNG (or the story MP4) onto an
+ * Instagram or Facebook Story.
  *
- * `navigator.share({ files })` (Web Share Level 2) is the only API that can
- * hand an image to the native share sheet from a web page, and only mobile
- * browsers ship it — so that path runs first, and everywhere else we save the
- * PNG and open the app (mobile, through its URL scheme, with a website
- * fallback if the app never takes over) or the site on desktop.
+ * Two separate paths, never bundled on mobile:
+ *
+ *   • `shareStoryFile` — Web Share Level 2 only (`navigator.share({ files })`),
+ *     the one API that can push a file into the native share sheet from a web
+ *     page (mobile browsers are the only place it exists). The blob goes
+ *     straight from memory to the sheet — nothing touches Downloads. A sheet
+ *     that refuses to open reports `failed` — plus a `reason` that says *why*
+ *     (`no-activation`, `unsupported-file`, `no-sheet`, `in-app`, `unknown`)
+ *     rather than silently saving a file the user never asked for; the caller
+ *     turns the reason into an actionable status line. Everything up to the
+ *     `navigator.share` call is synchronous, so a caller that invokes this
+ *     straight from a click hands the sheet that click's user activation.
+ *   • `saveAndOpenStoryFile` — the explicit desktop/sheet-less fallback: save
+ *     the file, then open the platform (phone URL scheme first, website as
+ *     backstop). The button that calls it says "Save …" in its label.
+ *
+ * `downloadStoryFile` is the plain save: it opens nothing at all.
  */
 
 const PLATFORMS = {
@@ -29,7 +41,26 @@ export const isTouchDevice = () =>
   ((typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches) ||
     /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ''));
 
-export const storyFileName = (platform = 'Instagram') => `laradama-${platformOf(platform).slug}-story.png`;
+/**
+ * Is the page running inside another app's webview — Instagram, Facebook,
+ * X/TikTok? Those shells routinely ship without `navigator.share`, or refuse
+ * to hand a file to the very app they live in, so a share failure here is
+ * their doing and the fix is a real browser (Safari/Chrome), not a retry.
+ */
+export const isInAppBrowser = () => {
+  if (typeof navigator === 'undefined') return false;
+  return /\bInstagram\b|FBAN|FBAV|Twitter|TikTok|LinkedInApp/i.test(navigator.userAgent || '');
+};
+
+/** 'video/mp4' -> 'mp4', 'image/png' -> 'png' — what the file name ends in. */
+const extOf = (blob) => {
+  const mime = String(blob?.type || '');
+  if (mime.includes('/')) return mime.split('/')[1].replace('x-', '') || 'png';
+  return 'png';
+};
+
+export const storyFileName = (platform = 'Instagram', ext = 'png') =>
+  `laradama-${platformOf(platform).slug}-story.${ext}`;
 
 /**
  * Can this browser push a file into a native share sheet at all? Called once
@@ -79,11 +110,11 @@ export function downloadBlob(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
-function savedHint(platform) {
+function savedHint(platform, name) {
   // Ctrl+J is the fastest way to find the file when the folder isn't where
   // the user expected (Downloads is often redirected, e.g. into Documents).
   const where = isTouchDevice() ? 'your downloads' : 'your Downloads folder (Ctrl+J)';
-  return `Saved ${storyFileName(platform)} to ${where} — open ${platform}, start a Story and add it.`;
+  return `Saved ${name} to ${where} — open ${platform}, start a Story and add it.`;
 }
 
 /**
@@ -164,38 +195,109 @@ function shareText(song) {
 }
 
 /**
- * Hand the PNG to the platform: native share sheet when the browser has one,
- * otherwise save it and open the app/site.
+ * Hand the rendered file to the platform through the native share sheet —
+ * and nothing else. The file never reaches Downloads on this path: the blob
+ * goes from memory straight into the OS sheet, where the user picks Instagram
+ * or Facebook. Cancelling the sheet is not a failure; a sheet that will not
+ * open (or a browser without one) comes back as `failed` so the caller can
+ * point at the Download buttons instead of saving unasked.
  *
- * @param {Blob} blob rendered story image
+ * Call this **from inside the click** that should open the sheet: every step
+ * before `navigator.share` is synchronous, so the sheet inherits the tap's
+ * ~5s user activation. Awaiting a render first is what loses it — which is
+ * exactly what `reason: 'no-activation'` reports back.
+ *
+ * @param {Blob} blob rendered story (PNG or MP4)
  * @param {{platform?: string, song?: {title: string, artist: string}}} opts
- * @returns {Promise<{phase: 'shared'|'cancelled'|'downloaded', message: string}>}
+ * @returns {Promise<{phase: 'shared'|'cancelled'|'failed', reason: string|null, errName: string|null, message: string}>}
+ *   `reason` — `no-activation` (the tap's window expired; retry from a fresh
+ *   tap), `unsupported-file` (`canShare` refuses this file, not just the
+ *   probe), `no-sheet` (no Web Share here at all), `in-app` (running inside
+ *   the platform's own webview), `unknown`.
  */
 export async function shareStoryFile(blob, { platform = 'Instagram', song } = {}) {
-  if (!blob?.size) throw new Error('the rendered Story image came back empty');
-  const name = storyFileName(platform);
-  const file = toFile(blob, name);
+  if (!blob?.size) throw new Error('the rendered Story export came back empty');
 
-  if (shareFilesSupport()) {
+  // Inside a webview every failure has the same cure — open the page in a
+  // real browser — so it overrides the finer-grained reasons below.
+  const inApp = isInAppBrowser();
+  const fail = (reason, message) => ({
+    phase: 'failed',
+    reason: inApp ? 'in-app' : reason,
+    errName: null,
+    message,
+  });
+
+  if (!shareFilesSupport()) {
+    return fail('no-sheet', 'This browser has no share sheet.');
+  }
+
+  const file = toFile(blob, storyFileName(platform, extOf(blob)));
+
+  // The probe in `shareFilesSupport` only proves `image/png` is shareable;
+  // the actual file can still be refused (an MP4 where the browser has no
+  // video target), which `navigator.share` would report as a bare TypeError.
+  if (typeof navigator.canShare === 'function') {
+    let shareable;
     try {
-      await navigator.share({ files: [file], title: 'Laradama story', text: shareText(song) });
-      return { phase: 'shared', message: `Shared to ${platform}.` };
-    } catch (err) {
-      if (err?.name === 'AbortError') {
-        return {
-          phase: 'cancelled',
-          message: 'Share cancelled — your Story image is ready whenever you want it.',
-        };
-      }
-      // NotAllowedError / SecurityError / a share target that choked → fall
-      // through to the save-and-open path rather than dead-ending.
-      console.warn('[story] navigator.share failed, falling back to a download:', err);
+      shareable = navigator.canShare({ files: [file] });
+    } catch {
+      shareable = false;
+    }
+    if (!shareable) {
+      const kind = extOf(blob) === 'mp4' ? 'video' : 'image';
+      return fail('unsupported-file', `This browser cannot send ${kind} files.`);
     }
   }
 
-  downloadBlob(file, name);
+  try {
+    await navigator.share({ files: [file], title: 'Laradama story', text: shareText(song) });
+    return { phase: 'shared', reason: null, errName: null, message: `Shared to ${platform}.` };
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      return {
+        phase: 'cancelled',
+        reason: null,
+        errName: 'AbortError',
+        message: 'Share cancelled — your Story is ready whenever you want it.',
+      };
+    }
+    // NotAllowedError (no user activation left), TypeError (refused data), or
+    // a share target that choked: report which, and let the caller choose the
+    // retry vs. the Download buttons — no silent save.
+    console.warn('[story] navigator.share failed:', err);
+    const errName = typeof err?.name === 'string' ? err.name : 'Error';
+    const reason =
+      errName === 'TypeError'
+        ? 'unsupported-file'
+        : errName === 'NotAllowedError' || errName === 'SecurityError'
+          ? 'no-activation'
+          : 'unknown';
+    return {
+      phase: 'failed',
+      // Same override as `fail`: inside a webview the webview is the reason.
+      reason: inApp ? 'in-app' : reason,
+      errName,
+      message: 'Could not open the share sheet.',
+    };
+  }
+}
+
+/**
+ * The explicit save-and-open action for browsers with no share sheet
+ * (desktop, older mobile): write the file to disk, then open the platform —
+ * on phones the app URL scheme first, on desktop the website. The button that
+ * calls this says "Save …" in its label, so nothing happens behind the user's
+ * back.
+ *
+ * @returns {Promise<{phase: 'downloaded', message: string}>}
+ */
+export async function saveAndOpenStoryFile(blob, { platform = 'Instagram' } = {}) {
+  if (!blob?.size) throw new Error('the rendered Story export came back empty');
+  const name = storyFileName(platform, extOf(blob));
+  downloadBlob(toFile(blob, name), name);
   openPlatform(platform);
-  return { phase: 'downloaded', message: savedHint(platform) };
+  return { phase: 'downloaded', message: savedHint(platform, name) };
 }
 
 /**
@@ -205,8 +307,8 @@ export async function shareStoryFile(blob, { platform = 'Instagram', song } = {}
  * @returns {Promise<{phase: 'downloaded', message: string}>}
  */
 export async function downloadStoryFile(blob, { platform = 'Instagram' } = {}) {
-  if (!blob?.size) throw new Error('the rendered Story image came back empty');
-  const name = storyFileName(platform);
+  if (!blob?.size) throw new Error('the rendered Story export came back empty');
+  const name = storyFileName(platform, extOf(blob));
   downloadBlob(toFile(blob, name), name);
-  return { phase: 'downloaded', message: savedHint(platform) };
+  return { phase: 'downloaded', message: savedHint(platform, name) };
 }

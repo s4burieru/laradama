@@ -1,9 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, ChevronLeft, ChevronRight, FastForward, ImagePlus, Pause, Play, Plus, Rewind, SkipBack, SkipForward, X } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  FastForward,
+  ImagePlus,
+  Pause,
+  Play,
+  Plus,
+  Rewind,
+  Share2,
+  SkipBack,
+  SkipForward,
+  X,
+} from "lucide-react";
 import { findMoreSongs, matchImageToTracks } from "../lib/match.js";
 import { spotifySearchUrl } from "../lib/spotify.js";
 import { renderStoryImage } from "../lib/storyImage.js";
-import { canShareFiles, downloadStoryFile, shareStoryFile } from "../lib/storyShare.js";
+import {
+  canShareFiles,
+  downloadStoryFile,
+  saveAndOpenStoryFile,
+  shareStoryFile,
+} from "../lib/storyShare.js";
+import { storyTemplates } from "../data/storyTemplates";
+import StoryPreview from "../components/StoryPreview";
+
+export { storyTemplates };
+
+/**
+ * The video encoder (and its Mediabunny muxer) only matters once the story
+ * modal is in play, so it rides in on demand — off the initial page bundle.
+ */
+const storyVideoModule = () => import("../lib/storyVideo.js");
 
 export const songs = [
   {
@@ -36,18 +65,10 @@ export const songs = [
   },
 ];
 
-export const storyTemplates = [
-  { id: "clean", label: "Clean" },
-  { id: "meme", label: "Meme" },
-  { id: "vinyl", label: "Vinyl" },
-  { id: "neon", label: "Neon" },
-  { id: "collage", label: "2x2 Collage" },
-];
-
 const stats = [
   { value: "2.3s", label: "avg. match time" },
   { value: "40+", label: "moods recognized" },
-  { value: "∞", label: "swipes to reshuffle" },
+  { value: "∞", label: "taps to reshuffle" },
 ];
 
 const SpotifyIcon = () => (
@@ -58,23 +79,6 @@ const SpotifyIcon = () => (
       stroke="#1ED760"
       strokeWidth="1.5"
       strokeLinecap="round"
-    />
-  </svg>
-);
-
-const InstagramIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <rect x="4" y="4" width="16" height="16" rx="5" stroke="#fff" strokeWidth="1.7" />
-    <circle cx="12" cy="12" r="3.6" stroke="#fff" strokeWidth="1.7" />
-    <circle cx="16.4" cy="7.6" r="1" fill="#fff" />
-  </svg>
-);
-
-const FacebookIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path
-      d="M14 8.5h2V5.3c-.35-.05-1.55-.15-2.95-.15-2.9 0-4.9 1.77-4.9 5.02V13H5.3v3.6h2.85V21h3.6v-4.4h2.75l.44-3.6h-3.19V10.5c0-1.04.28-1.75 2.05-1.75z"
-      fill="#fff"
     />
   </svg>
 );
@@ -114,38 +118,8 @@ const effectiveDuration = (el) => {
 };
 
 /** Dedupe key for a deck entry — must match the music layer's candidate keys. */
-const trackKey = (s) => `${String(s?.title || "").toLowerCase()}::${String(s?.artist || "").toLowerCase()}`;
-
-export function renderStoryTemplate(s, id, uploadedImage = null) {
-  const bg = uploadedImage
-    ? `background-image:url(${uploadedImage})`
-    : `background:${s.gradient}`;
-  // Brand mark shared by every template — the same file storyImage.js paints
-  // into the exported PNG, so preview and export stay identical.
-  const logo = `<img class="ld-story-logo" src="/laradama-logo.png" alt="">`;
-  if (id === "clean") {
-    return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-story-scrim-b"></div><div class="ld-story-wm">${logo}laradama</div><div class="ld-story-info"><div class="ld-story-title">${s.title}</div><div class="ld-story-artist">${s.artist} · trending now</div></div>`;
-  }
-  if (id === "meme") {
-    return `<div class="ld-story-bg contain" style="${bg}"></div><div class="ld-meme-bar top">${logo}my photo's soundtrack is</div><div class="ld-meme-bar bottom">${s.title}</div>`;
-  }
-  if (id === "vinyl") {
-    return `<div class="ld-story-bg blurbg" style="${bg}"></div><div class="ld-vinyl-disc"><div class="ld-vinyl-photo" style="${bg}"></div><div class="ld-vinyl-grooves"></div><div class="ld-vinyl-hole"></div></div><div class="ld-vinyl-caption">${s.title} — ${s.artist}</div><div class="ld-story-wm corner">${logo}laradama</div>`;
-  }
-  if (id === "neon") {
-    return `<div class="ld-story-bg" style="${bg}"></div><div class="ld-neon-duotone"></div><div class="ld-story-wm">${logo}laradama</div><div class="ld-neon-eq">${"<span></span>".repeat(7)}</div><div class="ld-neon-title">${s.title}</div><div class="ld-neon-wm-strip">laradama &nbsp;•&nbsp; laradama &nbsp;•&nbsp; laradama</div>`;
-  }
-  if (id === "collage") {
-    const tileStyles = Array.from({ length: 4 }, () => {
-      const bgStyle = uploadedImage
-        ? `background-image:url(${uploadedImage});background-size:cover;background-position:center center;`
-        : `background:${s.gradient};background-size:cover;background-position:center center;`;
-      return `<span class="ld-collage-tile" style="${bgStyle}"></span>`;
-    }).join("");
-    return `<div class="ld-collage-grid">${tileStyles}</div><div class="ld-collage-overlay"></div><div class="ld-story-wm">${logo}laradama</div><div class="ld-collage-caption"><span class="ld-collage-label">${s.title}</span><span class="ld-collage-sub">${s.artist}</span></div>`;
-  }
-  return "";
-}
+const trackKey = (s) =>
+  `${String(s?.title || "").toLowerCase()}::${String(s?.artist || "").toLowerCase()}`;
 
 export default function Hero() {
   const fileInputRef = useRef(null);
@@ -161,6 +135,9 @@ export default function Hero() {
   // Share/export outcome shown under the modal's buttons. `working` is the only
   // busy phase — everything else is a terminal message the user can read.
   const [share, setShare] = useState({ phase: "idle", message: "" });
+  // Whether this browser can encode the animated MP4 (probed once on mount;
+  // false → "Post to Story" keeps the PNG flow it always had).
+  const [videoSupported, setVideoSupported] = useState(false);
   const [matches, setMatches] = useState([]);
   const [status, setStatus] = useState("idle"); // idle | analyzing | ready
   const [progress, setProgress] = useState({ current: 0, duration: 0 });
@@ -169,6 +146,13 @@ export default function Hero() {
   const [fetchingMore, setFetchingMore] = useState(false);
 
   const audioRef = useRef(null);
+  // Mirror of `modalOpen` for the audio layer: any code that *starts* playback
+  // checks this instead of the state, so nothing can resume the track from
+  // under the share modal (see the pause effect below).
+  const modalPausedRef = useRef(false);
+  // Whether playback was actually running when the modal opened — closing it
+  // resumes exactly that, and leaves a track the user paused by hand alone.
+  const wasPlayingBeforeModalRef = useRef(false);
   const matchIdRef = useRef(0);
   // True while playback *should* be on — survives autoplay blocks so we can
   // retry the moment the browser allows it (first interaction / buffered data).
@@ -196,7 +180,12 @@ export default function Hero() {
 
   // Small readout next to the transport buttons.
   let statusLabel = "paused";
-  if (!hasAudio) statusLabel = analyzing ? "matching…" : fetchingMore ? "loading more…" : "no audio";
+  if (!hasAudio)
+    statusLabel = analyzing
+      ? "matching…"
+      : fetchingMore
+        ? "loading more…"
+        : "no audio";
   else if (buffering) statusLabel = "buffering…";
   else if (playing) statusLabel = "playing";
   else if (fetchingMore) statusLabel = "loading more…";
@@ -236,10 +225,16 @@ export default function Hero() {
     moreRef.current = true;
     setFetchingMore(true);
     try {
-      const more = await findMoreSongs(analysis, [...seenRef.current], batchRef.current + 1);
+      const more = await findMoreSongs(
+        analysis,
+        [...seenRef.current],
+        batchRef.current + 1,
+      );
       if (matchId !== matchIdRef.current) return; // a newer upload superseded this one
       batchRef.current += 1;
-      const fresh = more.filter((s) => s?.title && s?.audioUrl && !seenRef.current.has(trackKey(s)));
+      const fresh = more.filter(
+        (s) => s?.title && s?.audioUrl && !seenRef.current.has(trackKey(s)),
+      );
       if (!fresh.length) {
         emptyRef.current += 1;
         if (emptyRef.current >= 2) exhaustedRef.current = true; // no more matches for this photo
@@ -332,7 +327,9 @@ export default function Hero() {
         // frames — no extra load() call in between to restart the request.
         el.setAttribute("src", url);
       }
-      el.play().catch(() => {}); // autoplay blocked → retried below on canplay / first interaction
+      // The share modal owns the audio while it is open: attach the source,
+      // but let the pause effect decide when sound comes back.
+      if (!modalPausedRef.current) el.play().catch(() => {}); // autoplay blocked → retried below on canplay / first interaction
       warmAudio(pool[(idx + 1) % pool.length]?.audioUrl);
     } else {
       wantPlayRef.current = false;
@@ -349,7 +346,13 @@ export default function Hero() {
   useEffect(() => {
     const onFirstGesture = () => {
       const el = audioRef.current;
-      if (el && wantPlayRef.current && el.getAttribute("src") && el.paused) {
+      if (
+        el &&
+        wantPlayRef.current &&
+        !modalPausedRef.current &&
+        el.getAttribute("src") &&
+        el.paused
+      ) {
         el.play().catch(() => {});
       }
       if (el && !el.paused) {
@@ -367,10 +370,60 @@ export default function Hero() {
 
   const startIfWanted = () => {
     const el = audioRef.current;
-    if (el && wantPlayRef.current && el.getAttribute("src") && el.paused) {
+    if (
+      el &&
+      wantPlayRef.current &&
+      !modalPausedRef.current &&
+      el.getAttribute("src") &&
+      el.paused
+    ) {
       el.play().catch(() => {});
     }
   };
+
+  /**
+   * Playback the browser refused — the share sheet takes the page away before
+   * the modal closes, so the resume there can land while the tab is unfocused
+   * and get rejected. One shot: the next tap or keypress plays.
+   */
+  const retryPlayOnGesture = () => {
+    const onGesture = () => {
+      window.removeEventListener("pointerdown", onGesture);
+      window.removeEventListener("keydown", onGesture);
+      startIfWanted();
+    };
+    window.addEventListener("pointerdown", onGesture);
+    window.addEventListener("keydown", onGesture);
+  };
+
+  // The share modal takes the whole screen, so the audio freezes with it. Two
+  // things follow: the track can't reach its end and roll into the next match
+  // (which would change `storyKey` and throw away the Story render in
+  // progress), and `timeupdate` stops firing, so the card behind the dialog
+  // stops re-rendering four times a second.
+  useEffect(() => {
+    modalPausedRef.current = modalOpen;
+  }, [modalOpen]);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return undefined;
+    if (modalOpen) {
+      wasPlayingBeforeModalRef.current = !el.paused;
+      el.pause();
+      return undefined;
+    }
+    const resume = wasPlayingBeforeModalRef.current;
+    wasPlayingBeforeModalRef.current = false;
+    if (resume && wantPlayRef.current && el.getAttribute("src") && el.paused) {
+      el.play().catch(() => retryPlayOnGesture());
+    }
+    return undefined;
+    // `retryPlayOnGesture` (like `startIfWanted`) only reads refs, so it never
+    // needs to re-run this effect — and it must not, or reopening the modal
+    // would overwrite the "was playing" flag on the second run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen]);
 
   const toggleAudio = () => {
     const el = audioRef.current;
@@ -406,9 +459,16 @@ export default function Hero() {
   };
 
   const onProgressKeyDown = (e) => {
-    if (e.key === "ArrowRight") { e.preventDefault(); seekBy(5); }
-    else if (e.key === "ArrowLeft") { e.preventDefault(); seekBy(-5); }
-    else if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleAudio(); }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      seekBy(5);
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      seekBy(-5);
+    } else if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      toggleAudio();
+    }
   };
 
   const nextTrack = () => {
@@ -442,24 +502,34 @@ export default function Hero() {
     demoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const templateInner = (s, id) => renderStoryTemplate(s, id, uploadedImage);
-
-  // Everything the story modal needs: the panel to keep Tab inside, the four
-  // tiles for the arrow-key cursor, and whatever opened it so focus can go back.
+  // Everything the story modal needs: the panel to keep Tab inside, the dots
+  // the open animation lands focus on, and whatever opened it so focus can go
+  // back. The template picker is a carousel around the big preview now — the
+  // ‹ › buttons and the dots below it — so there is no thumbnail strip to
+  // scroll or keep a cursor on.
   const modalPanelRef = useRef(null);
-  const thumbRefs = useRef([]);
+  const dotRefs = useRef([]);
   const modalOpenerRef = useRef(null);
-  const templateScrollerRef = useRef(null);
 
-  const scrollTemplates = (direction) => {
-    const scroller = templateScrollerRef.current;
-    if (scroller) {
-      scroller.scrollBy({ left: direction * scroller.clientWidth * 0.8, behavior: "smooth" });
-    }
-  };
+  // Mirror of `currentTemplate` for the keyboard/swipe handlers below: reading
+  // state directly there is fine, but the open effect must not re-subscribe on
+  // every template change (that would steal focus from the arrows mid-browse).
+  const currentTemplateRef = useRef(currentTemplate);
+  useEffect(() => {
+    currentTemplateRef.current = currentTemplate;
+  }, [currentTemplate]);
+
+  // The picker locks while an export renders. A template change swaps
+  // `storyKey`, which throws the render in progress away and starts it again
+  // on the new style — tap a few times and it renders over and over without
+  // ever handing the finished file to the buttons below.
+  const shareBusy = share.phase === "working";
 
   /** Select a template by its index in `storyTemplates` (0-based). */
   const selectTemplate = (i) => {
+    // Every pick path — ‹ ›, dots, touch swipe, Home/End — funnels through
+    // here, so this one guard locks the whole carousel while it renders.
+    if (shareBusy) return;
     const pick = storyTemplates[i];
     if (!pick) return;
     setCurrentTemplate(pick.id);
@@ -467,18 +537,69 @@ export default function Hero() {
     setShare({ phase: "idle", message: "" });
   };
 
-  /** ←/→ (and ↑/↓) walk the picker, wrapping at both ends, and take focus. */
-  const onThumbKeyDown = (e, i) => {
-    const steps = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+  /**
+   * Pick the destination app. Reachable only where there is no native sheet
+   * to pick it for the user — the sheet's own choice wins on touch. The render
+   * never depends on the platform, so nothing re-renders here: only the file
+   * name, the app the save path opens and the status line change with it.
+   */
+  const selectPlatform = (name) => {
+    if (name === currentPlatform) return;
+    setCurrentPlatform(name);
+    // the previous "Shared …/Saved …" line names the old platform
+    setShare({ phase: "idle", message: "" });
+  };
+
+  /** ←/→ (and ↑/↓) step the carousel, wrapping at both ends. */
+  const stepTemplate = (dir) => {
     const n = storyTemplates.length;
-    let next = null;
-    if (e.key in steps) next = (i + steps[e.key] + n) % n;
-    else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = n - 1;
-    if (next === null) return;
-    e.preventDefault();
-    selectTemplate(next);
-    thumbRefs.current[next]?.focus();
+    const at = storyTemplates.findIndex(
+      (t) => t.id === currentTemplateRef.current,
+    );
+    selectTemplate(((at < 0 ? 0 : at) + dir + n) % n);
+  };
+
+  // Where the carousel is sitting — drives the "Clean · 2 / 5" line under the
+  // preview. -1 (unknown id) reads as the first template.
+  const currentTemplateIndex = Math.max(
+    0,
+    storyTemplates.findIndex((t) => t.id === currentTemplate),
+  );
+  const currentTemplateLabel =
+    storyTemplates[currentTemplateIndex]?.label ?? "";
+
+  // Touch swipe across the preview cycles templates the same way — the stage
+  // is the picker on phones, where the ‹ › targets are easy to miss.
+  const stageTouchX = useRef(null);
+  const onStageTouchStart = (e) => {
+    stageTouchX.current = e.touches[0].clientX;
+  };
+  const onStageTouchEnd = (e) => {
+    const startX = stageTouchX.current;
+    stageTouchX.current = null;
+    if (startX == null) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) stepTemplate(dx < 0 ? 1 : -1);
+  };
+
+  /**
+   * One keydown handler for the whole dialog: Tab stays trapped inside it, and
+   * ←/→ (and ↑/↓, Home, End) step the template carousel wherever focus is.
+   */
+  const onPanelKeyDown = (e) => {
+    trapFocus(e);
+    const steps = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+    if (e.key in steps) {
+      e.preventDefault();
+      stepTemplate(steps[e.key]);
+      return;
+    }
+    if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      const i = e.key === "Home" ? 0 : storyTemplates.length - 1;
+      selectTemplate(i);
+      dotRefs.current[i]?.focus();
+    }
   };
 
   /** Keep Tab inside the dialog — the page behind it is still focusable. */
@@ -487,7 +608,9 @@ export default function Hero() {
     const panel = modalPanelRef.current;
     if (!panel) return;
     const items = Array.from(
-      panel.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'),
+      panel.querySelectorAll(
+        'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      ),
     ).filter((el) => el.offsetParent !== null);
     if (!items.length) return;
     const first = items[0];
@@ -505,8 +628,9 @@ export default function Hero() {
   };
 
   // Escape closes the story modal (the ✕ and the overlay already do), and the
-  // moment it opens focus lands on the selected tile, so ←/→ start browsing
-  // without a Tab hunt first.
+  // moment it opens focus lands on the selected dot, so ←/→ start browsing
+  // without a Tab hunt first. Deliberately not re-run when the template
+  // changes — cycling must never yank focus off the ‹ › buttons.
   useEffect(() => {
     if (!modalOpen) return undefined;
     const onKey = (e) => {
@@ -514,14 +638,16 @@ export default function Hero() {
     };
     window.addEventListener("keydown", onKey);
     const raf = requestAnimationFrame(() => {
-      const i = storyTemplates.findIndex((t) => t.id === currentTemplate);
-      thumbRefs.current[i < 0 ? 0 : i]?.focus();
+      const i = storyTemplates.findIndex(
+        (t) => t.id === currentTemplateRef.current,
+      );
+      dotRefs.current[i < 0 ? 0 : i]?.focus();
     });
     return () => {
       window.removeEventListener("keydown", onKey);
       cancelAnimationFrame(raf);
     };
-  }, [modalOpen, currentTemplate]);
+  }, [modalOpen]);
 
   // ...and when it closes, focus goes back to the button that opened it, so
   // the next Tab doesn't start over at the top of the page. Runs for every
@@ -530,11 +656,15 @@ export default function Hero() {
     if (modalOpen) return undefined;
     const opener = modalOpenerRef.current;
     modalOpenerRef.current = null;
-    if (opener && document.contains(opener) && typeof opener.focus === "function") opener.focus();
+    if (
+      opener &&
+      document.contains(opener) &&
+      typeof opener.focus === "function"
+    )
+      opener.focus();
     return undefined;
   }, [modalOpen]);
 
-  const shareBusy = share.phase === "working";
   // Web Share only ships on mobile browsers — the primary button says so.
   const shareSupported = useMemo(() => canShareFiles(), []);
   const shareTone =
@@ -568,11 +698,36 @@ export default function Hero() {
    */
   const storyRenderRef = useRef(null); // { key, blob: Promise<Blob> }
   const storyRenderSeqRef = useRef(0);
+  // The finished Story waiting for its share sheet, tagged with the render it
+  // came from. Held instead of re-encoded so a second tap can hand
+  // `navigator.share` a file with no `await` in front of it — a fresh gesture
+  // carries the fresh ~5s user activation the sheet requires.
+  const [heldStory, setHeldStory] = useState(null); // { key, blob }
+  // Guards against two rapid taps firing two native sheets back to back.
+  const sheetPendingRef = useRef(false);
+  // Consecutive `no-activation` failures. The first is the render eating the
+  // activation window (retry from a fresh tap); a second one means the tap was
+  // fresh too, so the sheet is genuinely unavailable and a third tap would just
+  // repeat the loop.
+  const activationRetryRef = useRef(0);
   const [preparing, setPreparing] = useState(false);
   const storyKey = `${currentTemplate}|${song?.title || ""}|${song?.artist || ""}|${uploadedImage ? uploadedImage.length : 0}`;
 
+  // Adjusted while rendering — React's alternative to an effect for this: any
+  // change to the template/track/photo voids the held file, and with it the
+  // "tap again" status that belongs to it, so a frame from an earlier Story
+  // can never reach the sheet and no stale message survives the change.
+  const heldValid = Boolean(heldStory && heldStory.key === storyKey);
+  if (heldStory && !heldValid) setHeldStory(null);
+  if (!heldValid && share.phase === "ready")
+    setShare({ phase: "idle", message: "" });
+
   const startStoryRender = () => {
-    const pending = renderStoryImage({ song, templateId: currentTemplate, uploadedImage });
+    const pending = renderStoryImage({
+      song,
+      templateId: currentTemplate,
+      uploadedImage,
+    });
     const seq = ++storyRenderSeqRef.current;
     storyRenderRef.current = { key: storyKey, blob: pending };
     setPreparing(true);
@@ -580,7 +735,8 @@ export default function Hero() {
       .catch((err) => {
         console.warn("[story] could not render the Story image:", err);
         // drop the failed entry so the next click tries again
-        if (storyRenderRef.current?.blob === pending) storyRenderRef.current = null;
+        if (storyRenderRef.current?.blob === pending)
+          storyRenderRef.current = null;
       })
       .finally(() => {
         if (storyRenderSeqRef.current === seq) setPreparing(false);
@@ -593,13 +749,36 @@ export default function Hero() {
     return cached && cached.key === storyKey ? cached.blob : startStoryRender();
   };
 
-  // Pre-render while the modal shows a template (and whenever it changes).
+  // Probe video-export support once — the answer only changes with the browser.
+  useEffect(() => {
+    let alive = true;
+    storyVideoModule()
+      .then((m) => m.canExportVideo())
+      .then((ok) => {
+        if (alive) setVideoSupported(Boolean(ok));
+      })
+      .catch(() => {
+        if (alive) setVideoSupported(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Pre-render while the modal shows a template (and whenever it changes), and
+  // warm the decoded audio the video export bakes in — fetching + decoding the
+  // preview takes seconds that would otherwise sit inside the Post click.
   useEffect(() => {
     if (!modalOpen) return undefined;
     storyBlob();
+    if (videoSupported && song?.audioUrl) {
+      storyVideoModule()
+        .then((m) => m.prewarmStoryAudio(song.audioUrl))
+        .catch(() => {});
+    }
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modalOpen, storyKey]);
+  }, [modalOpen, storyKey, videoSupported]);
 
   /** Reuse the pre-rendered PNG when it matches; render on demand otherwise. */
   const renderStory = async () => {
@@ -607,22 +786,156 @@ export default function Hero() {
     return storyBlob();
   };
 
-  const exportFailed = (err) => {
-    console.warn("[story] could not export the Story image:", err);
-    setShare({ phase: "error", message: "Couldn't render the Story image — try another template." });
+  const exportFailed = (err, kind = "image") => {
+    console.warn(`[story] could not export the Story ${kind}:`, err);
+    setShare({
+      phase: "error",
+      message:
+        kind === "video"
+          ? "Couldn't render the Story video — try Download image or another template."
+          : "Couldn't render the Story image — try another template.",
+    });
+  };
+
+  /** Render the story video with the progress line the modal shows. */
+  const renderVideoWithProgress = async () => {
+    const silent = !song?.audioUrl;
+    const label = (p) =>
+      `${silent ? "No preview for this track. Rendering your story without music" : "Rendering your story video"}…${p < 1 ? ` ${Math.round(p * 100)}%` : ""}`;
+    setShare({ phase: "working", message: label(0) });
+    const { renderStoryVideo } = await storyVideoModule();
+    return renderStoryVideo({
+      song,
+      templateId: currentTemplate,
+      uploadedImage,
+      onProgress: (p) => setShare({ phase: "working", message: label(p) }),
+    });
+  };
+
+  /** What "Post to Story" shares: the video when the browser can encode one. */
+  const renderForShare = async () =>
+    videoSupported ? renderVideoWithProgress() : renderStory();
+
+  /**
+   * Status line for a sheet that would not open — one sentence that always
+   * names the control that still works.
+   *
+   * `no-activation` is the interesting one: rendering a video eats the click's
+   * ~5s user-activation window, so by the time the file exists the browser
+   * refuses the share. Nothing is wrong with the file — only a fresh tap is
+   * missing, and the button relabels itself to "Open share sheet" for exactly
+   * that state.
+   */
+  const shareFailureMessage = (res) => {
+    const alt = videoSupported ? "Download video" : "Download image";
+    switch (res?.reason) {
+      case "no-activation":
+        return "Tap Open share sheet again. The browser needs a fresh tap after rendering.";
+      case "unsupported-file":
+        return `This browser can't send ${videoSupported ? "video" : "image"} files. Use ${alt} instead.`;
+      case "no-sheet":
+        return `This browser has no share sheet. Use ${alt} instead.`;
+      case "in-app":
+        return `You're inside ${currentPlatform}'s in-app browser, which blocks sharing. Open this page in Safari or Chrome and tap again.`;
+      default:
+        return `Couldn't open the ${currentPlatform} share sheet. Use ${alt} instead.`;
+    }
+  };
+
+  /**
+   * Give an already-rendered Story to the native sheet. It never renders
+   * first: everything up to `navigator.share` runs inside the caller's own
+   * task, so the sheet inherits the tap that asked for it. Called directly
+   * from the button handler — adding an `await render …` in front of it is
+   * what broke this before.
+   */
+  const presentSheet = async (blob) => {
+    // Two taps in a row would otherwise fire two sheets back to back.
+    if (sheetPendingRef.current) return;
+    // Where the browser advertises activation, don't burn a share call we know
+    // it will refuse — go straight to the "tap again" state.
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.userActivation?.isActive === false
+    ) {
+      setShare({
+        phase: "ready",
+        message: shareFailureMessage({ reason: "no-activation" }),
+      });
+      return;
+    }
+    sheetPendingRef.current = true;
+    try {
+      const res = await shareStoryFile(blob, {
+        platform: currentPlatform,
+        song,
+      });
+      if (res.phase !== "failed") {
+        setShare({ phase: res.phase, message: res.message });
+        // Only a real share closes the modal — cancelled/failed stay open so
+        // the message (and the Download buttons) are actionable.
+        if (res.phase === "shared") closeStoryModal();
+        return;
+      }
+      if (res.reason === "no-activation") {
+        const retries = activationRetryRef.current;
+        activationRetryRef.current = retries + 1;
+        if (retries < 1) {
+          // First time round: the render outran the window. The file is in
+          // hand, so the button becomes "Open share sheet" and the next tap
+          // carries a fresh activation.
+          setShare({ phase: "ready", message: shareFailureMessage(res) });
+          return;
+        }
+        // The second attempt came from a fresh tap, so this isn't the render.
+        setShare({
+          phase: "error",
+          message: shareFailureMessage({ reason: "unknown" }),
+        });
+        return;
+      }
+      setShare({ phase: "error", message: shareFailureMessage(res) });
+    } catch (err) {
+      // `shareStoryFile` reports its own failures; this only catches a throw
+      // from the plumbing around it (e.g. an empty export).
+      console.warn("[story] share could not run:", err);
+      setShare({
+        phase: "error",
+        message: shareFailureMessage({ reason: "unknown" }),
+      });
+    } finally {
+      sheetPendingRef.current = false;
+    }
   };
 
   const handleShare = async () => {
     if (shareBusy) return;
     try {
-      const blob = await renderStory();
-      const res = await shareStoryFile(blob, { platform: currentPlatform, song });
+      // Reuse the previous render whenever the template/track/photo are
+      // unchanged — the sheet path needs the file *now*, inside this click's
+      // activation window, and re-encoding would spend it again.
+      let held = heldValid ? heldStory : null;
+      if (!held) {
+        const rendered = await renderForShare();
+        held = { key: storyKey, blob: rendered };
+        setHeldStory(held);
+        activationRetryRef.current = 0;
+      }
+      if (shareSupported) {
+        // Sheet-only: the file goes from memory to the OS share sheet and
+        // never touches Downloads. A sheet that won't open says so — it does
+        // not save a file the user never asked for.
+        await presentSheet(held.blob);
+        return;
+      }
+      // No share sheet (desktop / older browsers): the label says "Save …",
+      // so saving first and opening the platform is exactly what was promised.
+      const res = await saveAndOpenStoryFile(held.blob, {
+        platform: currentPlatform,
+      });
       setShare({ phase: res.phase, message: res.message });
-      // Only a real share closes the modal — on the save-and-open path it stays
-      // up so the "open Instagram and pick this file" instructions are readable.
-      if (res.phase === "shared") closeStoryModal();
     } catch (err) {
-      exportFailed(err);
+      exportFailed(err, videoSupported ? "video" : "image");
     }
   };
 
@@ -637,6 +950,17 @@ export default function Hero() {
     }
   };
 
+  const handleDownloadVideo = async () => {
+    if (shareBusy || !videoSupported) return;
+    try {
+      const blob = await renderVideoWithProgress();
+      const res = await downloadStoryFile(blob, { platform: currentPlatform });
+      setShare({ phase: res.phase, message: res.message });
+    } catch (err) {
+      exportFailed(err, "video");
+    }
+  };
+
   const swipeStyle = swipeDir
     ? {
         transform: `translateX(${swipeDir === "skip" ? "-140%" : "140%"}) rotate(${swipeDir === "skip" ? "-10" : "10"}deg)`,
@@ -647,284 +971,454 @@ export default function Hero() {
   return (
     <>
       <section className="relative overflow-hidden bg-[#121212]">
-      <div className="mx-auto grid max-w-375 grid-cols-1 items-center gap-10 px-6 pt-16 pb-24 sm:px-8 xl:grid-cols-[1.1fr_1.6fr]">
-        {/* Left copy */}
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-none border border-laradama-brand/25 bg-laradama-brand/10 px-3 py-1.5 font-mono text-xs tracking-[0.02em] text-laradama-brand">
-            <span className="inline-block h-1.5 w-1.5 animate-pulse-dot rounded-none bg-laradama-brand" />
-            NOW MATCHING TRENDING TRACKS
-          </span>
-          <h1 className="mt-6 font-display text-4xl font-bold leading-[1.1] tracking-[-0.02em] text-laradama-ink sm:text-5xl sm:leading-[1.04] xl:text-6xl">
-            Every image <br />
-            has a <span className="text-laradama-brand">soundtrack.</span>
-          </h1>
-          <p className="mt-6 max-w-120 text-lg leading-relaxed text-laradama-dim">
-           Upload or take a photo. Laradama App analyzes its mood, colors, and movement to find a trending song that fits the vibe. 
-           Not your type of song? Simply swipe to discover another match.
-          </p>
-          <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
-            <button
-              type="button"
-              onClick={openFilePicker}
-              className="inline-flex w-full items-center justify-center gap-2.5 rounded-none bg-laradama-brand px-6 py-3.5 text-[15.5px] font-bold text-[#06170C] transition hover:-translate-y-0.5 hover:bg-laradama-brand-hover sm:w-auto"
-            >
-              <Plus size={17} strokeWidth={2.4} /> Upload a photo
-            </button>
-            <button
-              type="button"
-              onClick={watchMatch}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-none border border-laradama-line px-6 py-3 text-[15px] font-semibold text-laradama-ink transition hover:border-laradama-dimmer hover:bg-laradama-elevated sm:w-auto"
-            >
-              Watch it match <ArrowRight size={16} />
-            </button>
+        <div className="mx-auto grid max-w-375 grid-cols-1 items-center gap-10 px-6 pt-16 pb-24 sm:px-8 xl:grid-cols-[1.1fr_1.6fr]">
+          {/* Left copy */}
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-none border border-laradama-brand/25 bg-laradama-brand/10 px-3 py-1.5 font-mono text-xs tracking-[0.02em] text-laradama-brand">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse-dot rounded-none bg-laradama-brand" />
+              NOW MATCHING TRENDING TRACKS
+            </span>
+            <h1 className="mt-6 font-display text-4xl font-bold leading-[1.1] tracking-[-0.02em] text-laradama-ink sm:text-5xl sm:leading-[1.04] xl:text-6xl">
+              Every image <br />
+              has a <span className="text-laradama-brand">soundtrack.</span>
+            </h1>
+            <p className="mt-6 max-w-120 text-lg leading-relaxed text-laradama-dim">
+              Upload or take a photo. Laradama analyzes its mood, colors, and
+              movement to find a trending song that fits the vibe. Not your type
+              of song? Tap the next track button to discover another match.
+            </p>
+            <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+              <button
+                type="button"
+                onClick={openFilePicker}
+                className="inline-flex w-full items-center justify-center gap-2.5 rounded-none bg-laradama-brand px-6 py-3.5 text-[15.5px] font-bold text-[#06170C] transition hover:-translate-y-0.5 hover:bg-laradama-brand-hover sm:w-auto"
+              >
+                <Plus size={17} strokeWidth={2.4} /> Upload a photo
+              </button>
+              <button
+                type="button"
+                onClick={watchMatch}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-none border border-laradama-line px-6 py-3 text-[15px] font-semibold text-laradama-ink transition hover:border-laradama-dimmer hover:bg-laradama-elevated sm:w-auto"
+              >
+                Watch it match <ArrowRight size={16} />
+              </button>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <audio
+              ref={audioRef}
+              hidden
+              preload="auto"
+              onTimeUpdate={onAudioTime}
+              onLoadedMetadata={onAudioTime}
+              onDurationChange={onAudioTime}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={onAudioEnded}
+              onWaiting={() => setBuffering(true)}
+              onPlaying={() => setBuffering(false)}
+              onCanPlay={() => {
+                setBuffering(false);
+                startIfWanted();
+              }}
+            />
+            <div className="mt-10 grid grid-cols-3 gap-x-4 gap-y-6 sm:gap-x-7">
+              {stats.map((s) => (
+                <div key={s.label} className="flex flex-col gap-0.5">
+                  <span className="font-display text-[22px] font-bold text-laradama-ink">
+                    {s.value}
+                  </span>
+                  <span className="text-xs text-laradama-dimmer">
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-          <audio
-            ref={audioRef}
-            hidden
-            preload="auto"
-            onTimeUpdate={onAudioTime}
-            onLoadedMetadata={onAudioTime}
-            onDurationChange={onAudioTime}
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onEnded={onAudioEnded}
-            onWaiting={() => setBuffering(true)}
-            onPlaying={() => setBuffering(false)}
-            onCanPlay={() => { setBuffering(false); startIfWanted(); }}
-          />
-          <div className="mt-10 grid grid-cols-3 gap-x-4 gap-y-6 sm:gap-x-7">
-            {stats.map((s) => (
-              <div key={s.label} className="flex flex-col gap-0.5">
-                <span className="font-display text-[22px] font-bold text-laradama-ink">{s.value}</span>
-                <span className="text-xs text-laradama-dimmer">{s.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Right interactive demo */}
-        <div className="relative mx-auto w-full translate-y-2 xl:translate-y-4">
-          <div className="ld-phone-stage">
-            <div className="ld-floaty a" />
-            <div className="ld-floaty b" />
-            <div ref={demoRef} className="ld-device-frame">
-              <div className="ld-browser-bar">
-                <span className="ld-bdot r" />
-                <span className="ld-bdot y" />
-                <span className="ld-bdot g" />
-                <span className="ld-browser-url">laradama.app/match</span>
-              </div>
-              <div className="ld-phone-screen">
-                <div className="ld-phone-topbar">
-                  {uploadedImage ? (
-                    <>
-                      <div className="ld-topbar-photo">
-                        <img src={uploadedImage} alt="Your uploaded photo" />
-                        <span className="ld-tlabel">MATCHED FROM YOUR PHOTO</span>
-                      </div>
-                      <div className="ld-photo-actions">
-                        <button
-                          type="button"
-                          className="ld-change-photo-btn"
-                          onClick={openFilePicker}
-                          aria-label="Change photo"
-                          title="Change photo"
-                        >
-                          <ImagePlus size={17} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          className="ld-change-photo-btn ld-remove-photo-btn"
-                          onClick={removePhoto}
-                          aria-label="Remove photo"
-                          title="Remove photo"
-                        >
-                          <X size={17} aria-hidden="true" />
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <span className="ld-tlabel">STEP 1 — ADD A PHOTO</span>
-                      <span className="ld-tlabel">0 / 4</span>
-                    </>
-                  )}
+          {/* Right interactive demo */}
+          <div className="relative mx-auto w-full translate-y-2 xl:translate-y-4">
+            <div className="ld-phone-stage">
+              <div className="ld-floaty a" />
+              <div className="ld-floaty b" />
+              <div ref={demoRef} className="ld-device-frame">
+                <div className="ld-browser-bar">
+                  <span className="ld-bdot r" />
+                  <span className="ld-bdot y" />
+                  <span className="ld-bdot g" />
+                  <span className="ld-browser-url">laradama.app/match</span>
                 </div>
-{!uploadedImage && (
-                <div className="ld-phone-upload-cta" id="phoneUploadCta" role="button" tabIndex={0} onClick={openFilePicker} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") openFilePicker(); }}>
-                  <div className="ld-icon-circle">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke="#1ED760" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="#1ED760" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                  <h4>Upload a photo</h4>
-                  <p>Drop in an image and Laradama will match it to a trending song, right here.</p>
-                </div>
-                )}
-                {uploadedImage && (
-                <div className="ld-card-stack">
-                  <div
-                    className="ld-song-card"
-                    style={swipeStyle}
-                  >
-                    <div className="ld-art">
-                      <div
-                        className="ld-art-blur"
-                        style={
-                          uploadedImage
-                            ? { backgroundImage: `url(${uploadedImage})` }
-                            : { background: song.gradient }
-                        }
-                      />
-                      {uploadedImage && (
-                        <div
-                          className="ld-art-fit"
-                          style={{ backgroundImage: `url(${uploadedImage})` }}
-                        />
-                      )}
-                      <div className="ld-scrim" />
-                      <div className="ld-photo-badge">
-                        <img src={uploadedImage || ""} style={uploadedImage ? undefined : { display: "none" }} alt="" />
-                        <span>{uploadedImage ? "YOUR PHOTO" : song.tag.toUpperCase()}</span>
-                      </div>
-                      {song.custom && (
-                        <span className="ld-pinpill" title="Pinned by a custom scan">
-                          Pinned · {song.custom.subject}
-                        </span>
-                      )}
-                      <div className="ld-eq">
-                        <span style={{ animationDelay: "0s" }} />
-                        <span style={{ animationDelay: ".15s" }} />
-                        <span style={{ animationDelay: ".3s" }} />
-                        <span style={{ animationDelay: ".1s" }} />
-                        <span style={{ animationDelay: ".25s" }} />
-                      </div>
-                      <span className="ld-tagpill">{analyzing ? "analyzing…" : song.tag}</span>
-                    </div>
-                    <div className="ld-info">
-                      <div className="ld-title">{analyzing ? "Matching your photo…" : song.title}</div>
-                      <div className="ld-artist">{analyzing ? "checking custom scans, then mood & color" : song.artist}</div>
-                      <div
-                        className="ld-progress"
-                        role="slider"
-                        aria-label="Seek within the track"
-                        aria-valuemin={0}
-                        aria-valuemax={Math.round(progress.duration) || 0}
-                        aria-valuenow={Math.round(progress.current) || 0}
-                        tabIndex={hasAudio ? 0 : -1}
-                        title={hasAudio ? "Click to seek" : "Upload a photo to play your match"}
-                        onClick={seekTo}
-                        onKeyDown={onProgressKeyDown}
-                      >
-                        <div style={{ width: progressPct }} />
-                      </div>
-                      <div className="ld-time-row">
-                        <span>{hasAudio ? fmtTime(progress.current) || "0:00" : "0:42"}</span>
-                        <span className="ld-tp-status">{statusLabel}</span>
-                        <span>{hasAudio ? fmtTime(progress.duration) || "0:00" : "2:58"}</span>
-                      </div>
-                      <div className="ld-transport">
-                        <div className="ld-tp-controls">
+                <div className="ld-phone-screen">
+                  <div className="ld-phone-topbar">
+                    {uploadedImage ? (
+                      <>
+                        <div className="ld-topbar-photo">
+                          <img src={uploadedImage} alt="Your uploaded photo" />
+                          <span className="ld-tlabel">
+                            MATCHED FROM YOUR PHOTO
+                          </span>
+                        </div>
+                        <div className="ld-photo-actions">
                           <button
-                            className="ld-tp-btn"
                             type="button"
-                            onClick={prevTrack}
-                            disabled={analyzing || idx === 0}
-                            aria-label="Go back to the previous track"
-                            title="Previous track"
+                            className="ld-change-photo-btn"
+                            onClick={openFilePicker}
+                            aria-label="Change photo"
+                            title="Change photo"
                           >
-                            <SkipBack size={14} strokeWidth={2.2} />
+                            <ImagePlus size={17} aria-hidden="true" />
                           </button>
                           <button
-                            className="ld-tp-btn"
                             type="button"
-                            onClick={() => seekBy(-10)}
-                            disabled={!hasAudio}
-                            aria-label="Rewind 10 seconds"
-                            title="Rewind 10s"
+                            className="ld-change-photo-btn ld-remove-photo-btn"
+                            onClick={removePhoto}
+                            aria-label="Remove photo"
+                            title="Remove photo"
                           >
-                            <Rewind size={14} strokeWidth={2.2} />
-                          </button>
-                          <button
-                            className={`ld-tp-btn primary${buffering ? " buffering" : ""}`}
-                            type="button"
-                            onClick={toggleAudio}
-                            disabled={!hasAudio}
-                            aria-label={playing ? "Pause" : "Play"}
-                            title={playing ? "Pause" : "Play"}
-                          >
-                            {playing ? (
-                              <Pause size={15} strokeWidth={2.4} fill="currentColor" />
-                            ) : (
-                              <Play size={15} strokeWidth={2.4} fill="currentColor" />
-                            )}
-                          </button>
-                          <button
-                            className="ld-tp-btn"
-                            type="button"
-                            onClick={() => seekBy(10)}
-                            disabled={!hasAudio}
-                            aria-label="Fast forward 10 seconds"
-                            title="Fast forward 10s"
-                          >
-                            <FastForward size={14} strokeWidth={2.2} />
-                          </button>
-                          <button
-                            className={`ld-tp-btn${fetchingMore ? " buffering" : ""}`}
-                            type="button"
-                            onClick={nextTrack}
-                            disabled={analyzing || pool.length < 2}
-                            aria-label="Skip to the next track"
-                            title={fetchingMore ? "Loading more tracks…" : "Next track"}
-                          >
-                            <SkipForward size={14} strokeWidth={2.2} />
+                            <X size={17} aria-hidden="true" />
                           </button>
                         </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="ld-tlabel">STEP 1 — ADD A PHOTO</span>
+                        <span className="ld-tlabel">0 / 4</span>
+                      </>
+                    )}
+                  </div>
+                  {!uploadedImage && (
+                    <div
+                      className="ld-phone-upload-cta"
+                      id="phoneUploadCta"
+                      role="button"
+                      tabIndex={0}
+                      onClick={openFilePicker}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ")
+                          openFilePicker();
+                      }}
+                    >
+                      <div className="ld-icon-circle">
+                        <svg
+                          width="22"
+                          height="22"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M12 16V4M12 4l-4 4M12 4l4 4"
+                            stroke="#1ED760"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+                            stroke="#1ED760"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
                       </div>
-                      <span className="ld-share-label">LISTEN & SHARE</span>
-                      <div className="ld-action-row">
-                        <button className="ld-spotify-btn" id="spotifyBtn" type="button" aria-label="Listen on Spotify" disabled={analyzing} title={analyzing ? "Matching your photo…" : "Listen on Spotify"} onClick={() => window.open(song.spotifyUrl || spotifySearchUrl(song.title, song.artist), "_blank")}>
-                          <SpotifyIcon /> Listen on Spotify
-                        </button>
-                        <button className="ld-icon-btn ig" id="igBtn" type="button" aria-label="Add to Instagram Story" disabled={analyzing} title={analyzing ? "Matching your photo…" : "Add to Instagram Story"} onClick={(e) => openStoryModal("Instagram", e.currentTarget)}>
-                          <InstagramIcon />
-                        </button>
-                        <button className="ld-icon-btn fb" id="fbBtn" type="button" aria-label="Add to Facebook Story" disabled={analyzing} title={analyzing ? "Matching your photo…" : "Add to Facebook Story"} onClick={(e) => openStoryModal("Facebook", e.currentTarget)}>
-                          <FacebookIcon />
-                        </button>
+                      <h4>Upload a photo</h4>
+                      <p>
+                        Drop in an image and Laradama will match it to a
+                        trending song, right here.
+                      </p>
+                    </div>
+                  )}
+                  {uploadedImage && (
+                    <div className="ld-card-stack">
+                      <div className="ld-song-card" style={swipeStyle}>
+                        <div className="ld-art">
+                          <div
+                            className="ld-art-blur"
+                            style={
+                              uploadedImage
+                                ? { backgroundImage: `url(${uploadedImage})` }
+                                : { background: song.gradient }
+                            }
+                          />
+                          {uploadedImage && (
+                            <div
+                              className="ld-art-fit"
+                              style={{
+                                backgroundImage: `url(${uploadedImage})`,
+                              }}
+                            />
+                          )}
+                          <div className="ld-scrim" />
+                          <div className="ld-photo-badge">
+                            <img
+                              src={uploadedImage || ""}
+                              style={
+                                uploadedImage ? undefined : { display: "none" }
+                              }
+                              alt=""
+                            />
+                            <span>
+                              {uploadedImage
+                                ? "YOUR PHOTO"
+                                : song.tag.toUpperCase()}
+                            </span>
+                          </div>
+                          {song.custom && (
+                            <span
+                              className="ld-pinpill"
+                              title="Pinned by a custom scan"
+                            >
+                              Pinned · {song.custom.subject}
+                            </span>
+                          )}
+                          <div className="ld-eq">
+                            <span style={{ animationDelay: "0s" }} />
+                            <span style={{ animationDelay: ".15s" }} />
+                            <span style={{ animationDelay: ".3s" }} />
+                            <span style={{ animationDelay: ".1s" }} />
+                            <span style={{ animationDelay: ".25s" }} />
+                          </div>
+                          <span className="ld-tagpill">
+                            {analyzing ? "analyzing…" : song.tag}
+                          </span>
+                        </div>
+                        <div className="ld-info">
+                          <div className="ld-title">
+                            {analyzing ? "Matching your photo…" : song.title}
+                          </div>
+                          <div className="ld-artist">
+                            {analyzing
+                              ? "checking custom scans, then mood & color"
+                              : song.artist}
+                          </div>
+                          <div
+                            className="ld-progress"
+                            role="slider"
+                            aria-label="Seek within the track"
+                            aria-valuemin={0}
+                            aria-valuemax={Math.round(progress.duration) || 0}
+                            aria-valuenow={Math.round(progress.current) || 0}
+                            tabIndex={hasAudio ? 0 : -1}
+                            title={
+                              hasAudio
+                                ? "Click to seek"
+                                : "Upload a photo to play your match"
+                            }
+                            onClick={seekTo}
+                            onKeyDown={onProgressKeyDown}
+                          >
+                            <div style={{ width: progressPct }} />
+                          </div>
+                          <div className="ld-time-row">
+                            <span>
+                              {hasAudio
+                                ? fmtTime(progress.current) || "0:00"
+                                : "0:42"}
+                            </span>
+                            <span className="ld-tp-status">{statusLabel}</span>
+                            <span>
+                              {hasAudio
+                                ? fmtTime(progress.duration) || "0:00"
+                                : "2:58"}
+                            </span>
+                          </div>
+                          <div className="ld-transport">
+                            <div className="ld-tp-controls">
+                              <button
+                                className="ld-tp-btn"
+                                type="button"
+                                onClick={prevTrack}
+                                disabled={analyzing || idx === 0}
+                                aria-label="Go back to the previous track"
+                                title="Previous track"
+                              >
+                                <SkipBack size={14} strokeWidth={2.2} />
+                              </button>
+                              <button
+                                className="ld-tp-btn"
+                                type="button"
+                                onClick={() => seekBy(-10)}
+                                disabled={!hasAudio}
+                                aria-label="Rewind 10 seconds"
+                                title="Rewind 10s"
+                              >
+                                <Rewind size={14} strokeWidth={2.2} />
+                              </button>
+                              <button
+                                className={`ld-tp-btn primary${buffering ? " buffering" : ""}`}
+                                type="button"
+                                onClick={toggleAudio}
+                                disabled={!hasAudio}
+                                aria-label={playing ? "Pause" : "Play"}
+                                title={playing ? "Pause" : "Play"}
+                              >
+                                {playing ? (
+                                  <Pause
+                                    size={15}
+                                    strokeWidth={2.4}
+                                    fill="currentColor"
+                                  />
+                                ) : (
+                                  <Play
+                                    size={15}
+                                    strokeWidth={2.4}
+                                    fill="currentColor"
+                                  />
+                                )}
+                              </button>
+                              <button
+                                className="ld-tp-btn"
+                                type="button"
+                                onClick={() => seekBy(10)}
+                                disabled={!hasAudio}
+                                aria-label="Fast forward 10 seconds"
+                                title="Fast forward 10s"
+                              >
+                                <FastForward size={14} strokeWidth={2.2} />
+                              </button>
+                              <button
+                                className={`ld-tp-btn${fetchingMore ? " buffering" : ""}`}
+                                type="button"
+                                onClick={nextTrack}
+                                disabled={analyzing || pool.length < 2}
+                                aria-label="Skip to the next track"
+                                title={
+                                  fetchingMore
+                                    ? "Loading more tracks…"
+                                    : "Next track"
+                                }
+                              >
+                                <SkipForward size={14} strokeWidth={2.2} />
+                              </button>
+                            </div>
+                          </div>
+                          <span className="ld-share-label">LISTEN & SHARE</span>
+                          <div className="ld-action-row">
+                            <button
+                              className="ld-spotify-btn"
+                              id="spotifyBtn"
+                              type="button"
+                              aria-label="Listen on Spotify"
+                              disabled={analyzing}
+                              title={
+                                analyzing
+                                  ? "Matching your photo…"
+                                  : "Listen on Spotify"
+                              }
+                              onClick={() =>
+                                window.open(
+                                  song.spotifyUrl ||
+                                    spotifySearchUrl(song.title, song.artist),
+                                  "_blank",
+                                )
+                              }
+                            >
+                              <SpotifyIcon /> Listen on Spotify
+                            </button>
+                            {/* One share button for every device — the modal is the
+                            single entry point now. Where the native sheet exists
+                            it is also where the platform gets picked (Instagram
+                            or Facebook), so the two platform buttons on the card
+                            would have run the same flow twice; where there is no
+                            sheet the modal offers the choice itself. */}
+                            <button
+                              className="ld-icon-btn share"
+                              id="shareBtn"
+                              type="button"
+                              aria-label="Share your story"
+                              disabled={analyzing}
+                              title={
+                                analyzing
+                                  ? "Matching your photo…"
+                                  : "Share your story"
+                              }
+                              onClick={(e) =>
+                                openStoryModal(currentPlatform, e.currentTarget)
+                              }
+                            >
+                              <Share2 />
+                            </button>
+                          </div>
+                          <button
+                            className="ld-why-toggle"
+                            id="ldWhyToggle"
+                            type="button"
+                            onClick={() => setWhyOpen((v) => !v)}
+                          >
+                            <span>✦</span> Why this song?
+                          </button>
+                          <div
+                            className={`ld-why-panel${whyOpen ? " open" : ""}`}
+                            id="ldWhyPanel"
+                          >
+                            <span className="ld-why-label">
+                              ✦ AI EXPLANATION
+                            </span>
+                            <span
+                              dangerouslySetInnerHTML={{
+                                __html: analyzing
+                                  ? "Checking it against custom scans, then reading your photo&rsquo;s colors, mood, and motion&hellip;"
+                                  : song.why,
+                              }}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <button className="ld-why-toggle" id="ldWhyToggle" type="button" onClick={() => setWhyOpen((v) => !v)}>
-                        <span>✦</span> Why this song?
-                      </button>
-                      <div className={`ld-why-panel${whyOpen ? " open" : ""}`} id="ldWhyPanel">
-                        <span className="ld-why-label">✦ AI EXPLANATION</span>
-                        <span dangerouslySetInnerHTML={{ __html: analyzing ? "Checking it against custom scans, then reading your photo&rsquo;s colors, mood, and motion&hellip;" : song.why }} />
+                      <div className="ld-swipe-controls">
+                        <button
+                          className="ld-swipe-btn skip"
+                          id="skipBtn"
+                          type="button"
+                          aria-label="Skip this song"
+                          onClick={() => handleSwipe("skip")}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none">
+                            <path
+                              d="M6 6l12 12M18 6L6 18"
+                              stroke="#ff8080"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          className="ld-swipe-btn keep"
+                          id="keepBtn"
+                          type="button"
+                          aria-label="Keep this song"
+                          onClick={() => handleSwipe("keep")}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none">
+                            <path
+                              d="M5 13l4 4L19 7"
+                              stroke="#06170C"
+                              strokeWidth="2.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </button>
                       </div>
                     </div>
-                  </div>
-                  <div className="ld-swipe-controls">
-                    <button className="ld-swipe-btn skip" id="skipBtn" type="button" aria-label="Skip this song" onClick={() => handleSwipe("skip")}>
-                      <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#ff8080" strokeWidth="2.2" strokeLinecap="round" /></svg>
-                    </button>
-                    <button className="ld-swipe-btn keep" id="keepBtn" type="button" aria-label="Keep this song" onClick={() => handleSwipe("keep")}>
-                      <svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#06170C" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    </button>
-                  </div>
+                  )}
                 </div>
-)}
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
-{/* ===== STORY TEMPLATE MODAL (clean / meme / vinyl / neon) ===== */}
+      </section>
+      {/* ===== STORY TEMPLATE MODAL — carousel picker (stage + dots) ===== */}
       <div
         className={`ld-modal-overlay ${modalOpen ? "open" : ""}`}
         id="storyModal"
-        onClick={(e) => { if (e.target.id === "storyModal") closeStoryModal(); }}
+        onClick={(e) => {
+          if (e.target.id === "storyModal") closeStoryModal();
+        }}
       >
         <div
           className="ld-modal-panel"
@@ -932,93 +1426,174 @@ export default function Hero() {
           aria-modal="true"
           aria-labelledby="storyModalTitle"
           ref={modalPanelRef}
-          onKeyDown={trapFocus}
+          onKeyDown={onPanelKeyDown}
         >
           <div className="ld-modal-head">
             <div>
               <h3 id="storyModalTitle">Choose a story template</h3>
               <p>
-                Your photo, the track, and a laradama watermark — pick a style before
-                posting to <span id="modalPlatform">{currentPlatform}</span>.
+                Your photo, the track, and a laradama watermark.{" "}
+                {shareSupported
+                  ? "Pick a style, then choose where it goes in your phone's share sheet."
+                  : "Pick a style, then choose where to post it below."}
               </p>
             </div>
-            <button className="ld-modal-close" id="modalClose" aria-label="Close" onClick={closeStoryModal}>✕</button>
-          </div>
-          <div
-            className="ld-story-card ld-big"
-            id="bigPreview"
-            dangerouslySetInnerHTML={{ __html: templateInner(song, currentTemplate) }}
-          />
-          {/* Radiogroup + roving tabindex: one Tab stop, ←/→ to browse. */}
-          <div className="ld-template-picker">
             <button
-              className="ld-template-scroll"
+              className="ld-modal-close"
+              id="modalClose"
+              aria-label="Close"
+              onClick={closeStoryModal}
+            >
+              ✕
+            </button>
+          </div>
+          {/* The stage is the picker: the preview with ‹ › controls on its
+              edges (and swipe on touch) cycles the templates in place. `key`
+              remounts the card on every change so the template's entrance
+              animation replays — a fresh fade-in wherever you land. */}
+          <div
+            className="ld-stage"
+            onTouchStart={onStageTouchStart}
+            onTouchEnd={onStageTouchEnd}
+          >
+            <StoryPreview
+              key={currentTemplate}
+              id="bigPreview"
+              className="ld-big"
+              song={song}
+              templateId={currentTemplate}
+              uploadedImage={uploadedImage}
+              animated
+            />
+            <button
+              className="ld-stage-nav prev"
               type="button"
-              aria-label="Scroll to previous templates"
-              onClick={() => scrollTemplates(-1)}
+              aria-label="Previous template"
+              disabled={shareBusy}
+              onClick={() => stepTemplate(-1)}
             >
               <ChevronLeft aria-hidden="true" />
             </button>
-            <div
-              className="ld-template-grid"
-              id="templateGrid"
-              role="radiogroup"
-              aria-label="Story templates"
-              ref={templateScrollerRef}
+            <button
+              className="ld-stage-nav next"
+              type="button"
+              aria-label="Next template"
+              disabled={shareBusy}
+              onClick={() => stepTemplate(1)}
             >
+              <ChevronRight aria-hidden="true" />
+            </button>
+          </div>
+          {/* One glance shows which style is showing and how many there are;
+              the dots jump straight to any template. */}
+          <div className="ld-template-meta">
+            <span className="ld-template-name" aria-live="polite">
+              {currentTemplateLabel}{" "}
+              <span className="ld-template-count">{`${currentTemplateIndex + 1} / ${storyTemplates.length}`}</span>
+            </span>
+            <div className="ld-dots" role="group" aria-label="Story templates">
               {storyTemplates.map((t, i) => {
                 const selected = currentTemplate === t.id;
                 return (
                   <button
                     key={t.id}
                     type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    tabIndex={selected ? 0 : -1}
-                    className={`ld-thumb-wrap ld-thumb-btn${selected ? " selected" : ""}`}
-                    ref={(el) => { thumbRefs.current[i] = el; }}
+                    className={`ld-dot${selected ? " on" : ""}`}
+                    aria-label={t.label}
+                    aria-pressed={selected}
+                    disabled={shareBusy}
+                    ref={(el) => {
+                      dotRefs.current[i] = el;
+                    }}
                     onClick={() => selectTemplate(i)}
-                    onKeyDown={(e) => onThumbKeyDown(e, i)}
-                  >
-                    <span
-                      className="ld-story-card thumb"
-                      dangerouslySetInnerHTML={{ __html: templateInner(song, t.id) }}
-                    />
-                    <span className="ld-thumb-check" aria-hidden="true">✓</span>
-                    <span className="ld-thumb-label">{t.label}</span>
-                  </button>
+                  />
                 );
               })}
             </div>
-            <button
-              className="ld-template-scroll"
-              type="button"
-              aria-label="Scroll to next templates"
-              onClick={() => scrollTemplates(1)}
-            >
-              <ChevronRight aria-hidden="true" />
-            </button>
           </div>
-          <p className="ld-template-hint">
-            <kbd>←</kbd> <kbd>→</kbd> switch template · <kbd>Esc</kbd> close
-          </p>
           {/* Sticky: Download / Post stay visible while the panel scrolls. */}
           <div className="ld-modal-foot">
+            {/* Where there is no native sheet to choose the app for the user
+                (desktop, older mobile), the destination is picked here — the
+                card itself only ever has the one share button. */}
+            {!shareSupported && (
+              <div
+                className="ld-platform-pick"
+                role="group"
+                aria-label="Choose where to post"
+              >
+                <span className="ld-platform-label">Post to</span>
+                {["Instagram", "Facebook"].map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    className={`ld-platform-btn${currentPlatform === name ? " on" : ""}`}
+                    aria-pressed={currentPlatform === name}
+                    disabled={shareBusy}
+                    onClick={() => selectPlatform(name)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="ld-modal-actions">
-              <button className="ld-btn-ghost" id="modalCancel" onClick={closeStoryModal}>Cancel</button>
-              <button className="ld-btn-ghost" id="modalDownload" onClick={handleDownload} disabled={shareBusy}>
-                Download
+              <button
+                className="ld-btn-ghost"
+                id="modalCancel"
+                onClick={closeStoryModal}
+                disabled={shareBusy}
+              >
+                Cancel
               </button>
-              <button className="ld-btn-primary" id="modalShare" onClick={handleShare} disabled={shareBusy}>
-                {shareBusy ? "Rendering…" : shareSupported ? "Post to Story" : `Save & open ${currentPlatform}`}
+              <button
+                className="ld-btn-ghost"
+                id="modalDownload"
+                onClick={handleDownload}
+                disabled={shareBusy}
+              >
+                Download image
+              </button>
+              {videoSupported && (
+                <button
+                  className="ld-btn-ghost"
+                  id="modalDownloadVideo"
+                  onClick={handleDownloadVideo}
+                  disabled={shareBusy}
+                >
+                  Download video
+                </button>
+              )}
+            </div>
+            {/* Own row so the primary can never be crowded out by the
+                downloads — it is the one action most users came for. */}
+            <div className="ld-modal-actions ld-modal-actions--primary">
+              <button
+                className="ld-btn-primary"
+                id="modalShare"
+                onClick={handleShare}
+                disabled={shareBusy}
+              >
+                {shareBusy
+                  ? "Rendering…"
+                  : shareSupported && share.phase === "ready"
+                    ? "Open share sheet"
+                    : shareSupported
+                      ? "Post to Story"
+                      : `Save ${videoSupported ? "video" : "image"} & open ${currentPlatform}`}
               </button>
             </div>
-            <p className={`ld-share-status${shareTone}`} role="status" aria-live="polite">
-              {share.message || (preparing ? "Getting your Story image ready…" : "")}
+            <p
+              className={`ld-share-status${shareTone}`}
+              role="status"
+              aria-live="polite"
+            >
+              {share.message ||
+                (preparing ? "Getting your Story image ready…" : "")}
             </p>
           </div>
         </div>
       </div>
-  </>
+    </>
   );
 }

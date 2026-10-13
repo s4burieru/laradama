@@ -13,7 +13,8 @@ import LegalPage from "./pages/LegalPage";
 import HowToUsePage from "./pages/HowToUsePage.jsx";
 
 export default function App() {
-  const path = window.location.pathname;
+  // Trailing slashes normalized so "/team/" and "/team" hit the same branch.
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
 
   let page;
   if (path === "/team") {
