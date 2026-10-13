@@ -129,7 +129,7 @@ export default function TeamPage() {
               <span className="inline-block h-1.5 w-1.5 animate-pulse-dot rounded-none bg-laradama-brand" />
               OUR TEAM
             </span>
-            <h1 className="mt-6 font-display text-4xl font-bold leading-[1.1] tracking-[-0.03em] text-laradama-brand sm:text-5xl">
+            <h1 className="mt-6 font-display text-4xl font-bold leading-[1.1] tracking-[-0.03em] text-laradama-brand sm:text-4xl">
               Meet our Development Team
             </h1>
             <p className="mx-auto mt-4 max-w-3xl text-base leading-relaxed text-[#8f8f93] sm:text-lg">
