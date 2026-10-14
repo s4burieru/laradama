@@ -74,14 +74,14 @@ export default function Navbar() {
       </nav>
 
       {open && (
-        <div className="absolute left-0 right-0 top-20 max-h-[calc(100vh-5rem)] overflow-y-auto border-b border-[#808080] bg-[#121212] px-8 pb-12 pt-6 backdrop-blur-xl min-[640px]:hidden">
+        <div className="absolute left-0 right-0 top-20 max-h-[calc(100vh-5rem)] overflow-y-auto border-b border-[#808080] bg-[#121212] px-4 pb-12 pt-6 backdrop-blur-xl min-[640px]:hidden">
           <ul className="flex flex-col gap-2">
             {links.map((link) => (
               <li key={link.label}>
                 <a
                   href={link.href}
                   onClick={() => setOpen(false)}
-                  className="block px-4 py-4 text-base font-medium text-[#d0d0d0] transition hover:bg-white/5 hover:text-white"
+                  className="block px-2 py-4 text-base font-medium text-[#d0d0d0] transition hover:bg-white/5 hover:text-white"
                 >
                   {link.label}
                 </a>
@@ -91,12 +91,12 @@ export default function Navbar() {
               <a
                 href="/team"
                 onClick={() => setOpen(false)}
-                className="block px-4 py-4 text-base font-medium text-[#d0d0d0] transition hover:bg-white/5 hover:text-white"
+                className="block px-2 py-4 text-base font-medium text-[#d0d0d0] transition hover:bg-white/5 hover:text-white"
               >
                 Team
               </a>
             </li>
-            <li className="px-4 pt-6">
+            <li className="px-2 pt-6">
               <a
                 href="/contact"
                 onClick={() => setOpen(false)}
