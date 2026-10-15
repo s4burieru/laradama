@@ -38,11 +38,51 @@ const steps = [
 ];
 
 function StepImagePlaceholder({ number, title }) {
+  if (number === "01") {
+    return (
+      <img
+        src="/how-to-choose-photo.png"
+        alt="Step 01: Choose a photo and upload it to Laradama"
+        className="aspect-video w-full border border-[#383838] bg-[#121212] object-contain"
+      />
+    );
+  }
+
+  if (number === "02") {
+    return (
+      <img
+        src="/how-to-analyze-mood.png"
+        alt="Step 02: Laradama analyzes a photo's mood"
+        className="aspect-video w-full border border-[#383838] bg-[#121212] object-contain"
+      />
+    );
+  }
+
+  if (number === "03") {
+    return (
+      <img
+        src="/how-to-explore-match.png"
+        alt="Step 03: Explore a music match inspired by your photo"
+        className="aspect-video w-full border border-[#383838] bg-[#121212] object-contain"
+      />
+    );
+  }
+
+  if (number === "04") {
+    return (
+      <img
+        src="/how-to-make-it-yours.png"
+        alt="Step 04: Find and save or share your music match"
+        className="aspect-video w-full border border-[#383838] bg-[#121212] object-contain"
+      />
+    );
+  }
+
   return (
     <div
       role="img"
       aria-label={`Image placeholder for step ${number}: ${title}`}
-      className="relative flex aspect-[16/10] w-full flex-col items-center justify-center overflow-hidden border border-dashed border-laradama-brand/50 bg-[#171717] px-6 text-center"
+      className="relative flex aspect-video w-full flex-col items-center justify-center overflow-hidden border border-dashed border-laradama-brand/50 bg-[#171717] px-6 text-center"
     >
       <span className="absolute left-4 top-4 font-mono text-xs tracking-[0.12em] text-laradama-brand">
         STEP {number}
